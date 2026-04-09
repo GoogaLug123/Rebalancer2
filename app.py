@@ -1,4 +1,4 @@
-            """
+"""
 app.py — Streamlit UI for the portfolio rebalancing engine.
 
 Run:
