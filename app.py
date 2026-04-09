@@ -97,22 +97,22 @@ _init_state()
 
 SAMPLE_CSV = """\
 account_id,ticker,quantity,price,cash_balance
-HIN001,CBA,420,121.50,5000.00
-HIN001,BHP,180,46.20,5000.00
-HIN001,CSL,55,289.00,5000.00
-HIN001,WES,90,68.50,5000.00
-HIN001,ANZ,200,29.40,5000.00
-HIN002,CBA,600,121.50,8500.00
-HIN002,BHP,300,46.20,8500.00
-HIN002,CSL,90,289.00,8500.00
-HIN002,WES,220,68.50,8500.00
-HIN002,ANZ,410,29.40,8500.00
-HIN002,WBC,350,29.10,8500.00
-HIN003,CBA,200,121.50,2000.00
-HIN003,BHP,150,46.20,2000.00
-HIN003,CSL,0,289.00,2000.00
-HIN003,WES,0,68.50,2000.00
-HIN003,ANZ,0,29.40,2000.00
+HIN001,CBA,420.0000,121.5000,5000.0000
+HIN001,BHP,180.0000,46.2000,5000.0000
+HIN001,CSL,55.2500,289.0000,5000.0000
+HIN001,WES,90.0000,68.5000,5000.0000
+HIN001,ANZ,200.0000,29.4000,5000.0000
+HIN002,CBA,600.0000,121.5000,8500.0000
+HIN002,BHP,300.0000,46.2000,8500.0000
+HIN002,CSL,90.7500,289.0000,8500.0000
+HIN002,WES,220.0000,68.5000,8500.0000
+HIN002,ANZ,410.0000,29.4000,8500.0000
+HIN002,WBC,350.0000,29.1000,8500.0000
+HIN003,CBA,200.0000,121.5000,2000.0000
+HIN003,BHP,150.3300,46.2000,2000.0000
+HIN003,CSL,0.0000,289.0000,2000.0000
+HIN003,WES,0.0000,68.5000,2000.0000
+HIN003,ANZ,0.0000,29.4000,2000.0000
 """
 
 SAMPLE_WEIGHTS = [
@@ -183,8 +183,8 @@ with st.sidebar:
     with st.expander("CSV format"):
         st.code(
             "account_id,ticker,quantity,price,cash_balance\n"
-            "HIN001,CBA,150,121.50,5000.00\n"
-            "HIN001,BHP,200,46.20,5000.00",
+            "HIN001,CBA,150.0000,121.5000,5000.0000\n"
+            "HIN001,BHP,200.2500,46.2000,5000.0000",
             language="text",
         )
 
@@ -209,8 +209,8 @@ with st.sidebar:
                 "Weight (%)",
                 min_value=0.01,
                 max_value=100.0,
-                step=0.5,
-                format="%.2f",
+                step=0.01,
+                format="%.4f",
             ),
         },
         hide_index=True,
@@ -270,6 +270,24 @@ with st.sidebar:
         help="Suppress trades smaller than this amount",
     )
 
+    fractional_shares = st.checkbox(
+        "Allow fractional shares",
+        value=True,
+        help="Enable fractional unit trading (e.g. managed funds, ETFs)",
+    )
+
+    if fractional_shares:
+        decimal_places = st.number_input(
+            "Decimal places for quantities",
+            min_value=1,
+            max_value=6,
+            value=4,
+            step=1,
+            help="Number of decimal places for fractional quantities",
+        )
+    else:
+        decimal_places = 0
+
     ready = bool(st.session_state.portfolios and st.session_state.model)
     run_btn = st.button(
         "▶  Run rebalance",
@@ -292,6 +310,8 @@ if run_btn and ready:
     config = TradeConfig(
         drift_threshold=drift_threshold,
         min_trade_value=min_trade_value,
+        whole_shares=not fractional_shares,
+        managed_fund_dp=int(decimal_places) if fractional_shares else 0,
     )
     drift_reports = []
     trade_results = []
@@ -364,7 +384,7 @@ c1.metric("Accounts", len(drift_reports))
 c2.metric("Need rebalance", accounts_requiring)
 c3.metric("Flagged holdings", total_flagged)
 c4.metric("Total trades", total_trades)
-c5.metric("Net cash flow", f"${gross_sell - gross_buy:+,.0f}")
+c5.metric("Net cash flow", f"${gross_sell - gross_buy:+,.4f}")
 
 st.divider()
 
@@ -384,12 +404,12 @@ for tab, drift_report in zip(tabs, drift_reports):
 
         # ── Account summary row ──────────────────────────────────────────
         col_a, col_b, col_c, col_d = st.columns(4)
-        col_a.metric("Portfolio value", f"${drift_report.total_portfolio_value:,.2f}")
+        col_a.metric("Portfolio value", f"${drift_report.total_portfolio_value:,.4f}")
         col_b.metric("Holdings", len(drift_report.holdings))
         col_c.metric("Flagged", drift_report.flagged_count)
         if trade_result:
             shortfall_label = "⚠ Shortfall" if trade_result.has_funding_shortfall else "Closing cash"
-            col_d.metric(shortfall_label, f"${trade_result.closing_cash:,.2f}")
+            col_d.metric(shortfall_label, f"${trade_result.closing_cash:,.4f}")
 
         st.divider()
 
@@ -408,10 +428,10 @@ for tab, drift_report in zip(tabs, drift_reports):
             drift_rows.append({
                 "Ticker":         h.ticker,
                 "Status":         h.status.value,
-                "Current (%)":    round(h.current_weight * 100, 2),
-                "Target (%)":     round(h.target_weight * 100, 2),
-                "Drift (pp)":     round(h.drift * 100, 2),
-                "Market Value":   round(h.market_value, 2),
+                "Current (%)":    round(h.current_weight * 100, 4),
+                "Target (%)":     round(h.target_weight * 100, 4),
+                "Drift (pp)":     round(h.drift * 100, 4),
+                "Market Value":   round(h.market_value, 4),
                 "Flag":           h.exceeds_threshold,
             })
 
@@ -430,10 +450,10 @@ for tab, drift_report in zip(tabs, drift_reports):
             .style
             .map(_colour_drift, subset=["Drift (pp)"])
             .format({
-                "Current (%)":  "{:.2f}%",
-                "Target (%)":   "{:.2f}%",
-                "Drift (pp)":   "{:+.2f}pp",
-                "Market Value": "${:,.2f}",
+                "Current (%)":  "{:.4f}%",
+                "Target (%)":   "{:.4f}%",
+                "Drift (pp)":   "{:+.4f}pp",
+                "Market Value": "${:,.4f}",
             })
             .hide(axis="index")
         )
@@ -460,27 +480,27 @@ for tab, drift_report in zip(tabs, drift_reports):
 
             # Cash flow summary
             cf1, cf2, cf3, cf4 = st.columns(4)
-            cf1.metric("Opening cash",  f"${trade_result.opening_cash:,.2f}")
-            cf2.metric("Sell proceeds", f"${trade_result.sell_proceeds:,.2f}")
-            cf3.metric("Buy cost",      f"${trade_result.buy_cost:,.2f}")
+            cf1.metric("Opening cash",  f"${trade_result.opening_cash:,.4f}")
+            cf2.metric("Sell proceeds", f"${trade_result.sell_proceeds:,.4f}")
+            cf3.metric("Buy cost",      f"${trade_result.buy_cost:,.4f}")
             cf4.metric(
                 "Closing cash" if not trade_result.has_funding_shortfall else "⚠ Shortfall",
-                f"${trade_result.closing_cash:,.2f}",
+                f"${trade_result.closing_cash:,.4f}",
             )
 
             if trade_result.has_funding_shortfall:
                 st.warning(
-                    f"Funding shortfall of ${abs(trade_result.closing_cash):,.2f}. "
+                    f"Funding shortfall of ${abs(trade_result.closing_cash):,.4f}. "
                     "Buy cost exceeds available cash. Adviser review required."
                 )
 
             if trade_result.trades:
                 trade_rows = [
                     {
-                        "Action":    t.action,
-                        "Ticker":    t.ticker,
-                        "Quantity":  int(t.quantity) if t.quantity == int(t.quantity) else t.quantity,
-                        "Est. Value": round(t.estimated_value, 2),
+                        "Action":     t.action,
+                        "Ticker":     t.ticker,
+                        "Quantity":   round(t.quantity, 4),
+                        "Est. Value": round(t.estimated_value, 4),
                     }
                     for t in trade_result.trades
                 ]
@@ -497,7 +517,10 @@ for tab, drift_report in zip(tabs, drift_reports):
                     trade_df
                     .style
                     .map(_colour_action, subset=["Action"])
-                    .format({"Est. Value": "${:,.2f}"})
+                    .format({
+                        "Quantity":   "{:.4f}",
+                        "Est. Value": "${:,.4f}",
+                    })
                     .hide(axis="index")
                 )
                 st.dataframe(styled_trades, use_container_width=True, height=220)
@@ -508,10 +531,10 @@ for tab, drift_report in zip(tabs, drift_reports):
                 ):
                     sup_rows = [
                         {
-                            "Action":  td.action,
-                            "Ticker":  td.ticker,
-                            "Raw value": round(td.raw_trade_value, 2),
-                            "Reason":  td.suppression_reason or "",
+                            "Action":    td.action,
+                            "Ticker":    td.ticker,
+                            "Raw value": round(td.raw_trade_value, 4),
+                            "Reason":    td.suppression_reason or "",
                         }
                         for td in trade_result.suppressed_trades
                     ]
@@ -536,29 +559,4 @@ if all_trades:
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".csv", delete=False, encoding="utf-8"
         ) as f:
-            tmp_dl = f.name
-        try:
-            export_trades_csv(all_trades, tmp_dl, include_metadata=True)
-            with open(tmp_dl, "rb") as f:
-                csv_bytes = f.read()
-        finally:
-            os.unlink(tmp_dl)
-
-        st.download_button(
-            label="⬇  Download all trades (CSV)",
-            data=csv_bytes,
-            file_name=f"trades_{model.model_id}_{model.version}.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-
-    with col_dl2:
-        st.caption(
-            f"{len(all_trades)} trade(s) across "
-            f"{len(set(t.account_id for t in all_trades))} account(s).  "
-            f"Gross buy: ${gross_buy:,.2f}  ·  "
-            f"Gross sell: ${gross_sell:,.2f}  ·  "
-            f"Net cash flow: ${gross_sell - gross_buy:+,.2f}"
-        )
-else:
-    st.caption("No active trades generated.")
+       
