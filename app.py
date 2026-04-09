@@ -555,8 +555,7 @@ if all_trades:
     col_dl1, col_dl2 = st.columns([2, 5])
 
     with col_dl1:
-        # Write to in-memory bytes via a temp file
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".csv", delete=False, encoding="utf-8"
-        ) as f:
-       
+        tmp_dl = tempfile.mktemp(suffix=".csv")
+        export_trades_csv(all_trades, tmp_dl, include_metadata=True)
+        with open(tmp_dl, "rb") as f:
+            csv_bytes = f.rea
