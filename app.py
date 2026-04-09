@@ -428,7 +428,7 @@ for tab, drift_report in zip(tabs, drift_reports):
         styled = (
             drift_df
             .style
-            .applymap(_colour_drift, subset=["Drift (pp)"])
+            .map(_colour_drift, subset=["Drift (pp)"])
             .format({
                 "Current (%)":  "{:.2f}%",
                 "Target (%)":   "{:.2f}%",
@@ -496,7 +496,7 @@ for tab, drift_report in zip(tabs, drift_reports):
                 styled_trades = (
                     trade_df
                     .style
-                    .applymap(_colour_action, subset=["Action"])
+                    .map(_colour_action, subset=["Action"])
                     .format({"Est. Value": "${:,.2f}"})
                     .hide(axis="index")
                 )
