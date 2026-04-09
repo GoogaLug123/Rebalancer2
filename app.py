@@ -80,16 +80,35 @@ st.markdown("""
 def _init_state() -> None:
     defaults = {
         "portfolios": [],           # list[Portfolio]
-        "model": None,              # ModelPortfolio | None
+        "model": None,              # ModelPortfolio | None (currently active)
+        "saved_models": {},         # dict[str, ModelPortfolio] — persists across runs
         "drift_reports": [],        # list[DriftReport]
         "trade_results": [],        # list[TradeResult]
-        "active_account": None,     # str | None  (which account tab is active)
+        "active_account": None,     # str | None
     }
     for key, val in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = val
 
 _init_state()
+
+# Pre-load the sample GROWTH_70 model on first run
+if not st.session_state.saved_models:
+    try:
+        _sample_holdings = [
+            ModelHolding(ticker=t, target_weight=w / 100.0)
+            for t, w in [
+                ("CBA", 25.0), ("BHP", 20.0), ("CSL", 15.0),
+                ("WES", 15.0), ("ANZ", 12.0), ("MQG", 8.0), ("FMG", 5.0),
+            ]
+        ]
+        _sample_model = ModelPortfolio(
+            model_id="GROWTH_70", version="2024-Q2", holdings=_sample_holdings
+        )
+        st.session_state.saved_models["GROWTH_70 (2024-Q2)"] = _sample_model
+        st.session_state.model = _sample_model
+    except Exception:
+        pass
 
 # ---------------------------------------------------------------------------
 # Sample data helpers
@@ -190,63 +209,119 @@ with st.sidebar:
 
     st.divider()
 
-    # ── Step 2 — Model weights ───────────────────────────────────────────
+    # ── Step 2 — Model portfolio ─────────────────────────────────────────
     st.subheader("2 · Model portfolio")
 
-    model_id = st.text_input("Model ID", value="GROWTH_70")
-    model_version = st.text_input("Version", value="2024-Q2")
+    saved_models: dict = st.session_state.saved_models
+    saved_keys = list(saved_models.keys())
 
-    st.caption("Enter target weights (must sum to 100%)")
-
-    # Editable weight table
-    default_df = pd.DataFrame(SAMPLE_WEIGHTS, columns=["Ticker", "Weight"])
-    weight_df = st.data_editor(
-        default_df,
-        num_rows="dynamic",
-        column_config={
-            "Ticker": st.column_config.TextColumn("Ticker", width="small"),
-            "Weight": st.column_config.NumberColumn(
-                "Weight (%)",
-                min_value=0.01,
-                max_value=100.0,
-                step=0.01,
-                format="%.4f",
-            ),
-        },
-        hide_index=True,
-        use_container_width=True,
-        key="weight_editor",
-    )
-
-    # Weight sum indicator
-    weight_sum = weight_df["Weight"].sum() if not weight_df.empty else 0.0
-    delta = weight_sum - 100.0
-    if abs(delta) < 0.05:
-        st.success(f"Weights sum: {weight_sum:.2f}% ✓")
-    else:
-        st.warning(f"Weights sum: {weight_sum:.2f}%  (need 100%,  {delta:+.2f}%)")
-
-    if st.button("Save model", use_container_width=True, type="primary"):
-        try:
-            holdings = [
-                ModelHolding(
-                    ticker=str(row["Ticker"]).strip().upper(),
-                    target_weight=float(row["Weight"]) / 100.0,
-                )
-                for _, row in weight_df.iterrows()
-                if str(row["Ticker"]).strip()
-            ]
-            model = ModelPortfolio(
-                model_id=model_id.strip(),
-                version=model_version.strip(),
-                holdings=holdings,
+    # ── Select existing model ────────────────────────────────────────────
+    if saved_keys:
+        # Determine default index — keep current model selected if possible
+        current_key = None
+        if st.session_state.model:
+            current_label = (
+                f"{st.session_state.model.model_id} "
+                f"({st.session_state.model.version})"
             )
-            st.session_state.model = model
-            st.session_state.drift_reports = []
-            st.session_state.trade_results = []
-            st.success(f"Model '{model_id}' saved.")
-        except ValueError as exc:
-            st.error(str(exc))
+            current_key = current_label if current_label in saved_keys else saved_keys[0]
+        else:
+            current_key = saved_keys[0]
+
+        selected_key = st.selectbox(
+            "Select model",
+            options=saved_keys,
+            index=saved_keys.index(current_key),
+            key="model_selector",
+        )
+
+        col_use, col_del = st.columns([3, 1])
+        with col_use:
+            if st.button("Use this model", use_container_width=True, type="primary"):
+                st.session_state.model = saved_models[selected_key]
+                st.session_state.drift_reports = []
+                st.session_state.trade_results = []
+                st.success(f"Active: {selected_key}")
+        with col_del:
+            if st.button("🗑", use_container_width=True, help="Delete this model"):
+                del st.session_state.saved_models[selected_key]
+                if st.session_state.model and (
+                    f"{st.session_state.model.model_id} ({st.session_state.model.version})"
+                    == selected_key
+                ):
+                    st.session_state.model = None
+                    st.session_state.drift_reports = []
+                    st.session_state.trade_results = []
+                st.rerun()
+
+        # Show active model name
+        if st.session_state.model:
+            st.caption(
+                f"Active: **{st.session_state.model.model_id}** "
+                f"v{st.session_state.model.version} "
+                f"· {len(st.session_state.model.holdings)} holdings"
+            )
+
+    else:
+        st.info("No saved models yet. Create one below.")
+
+    # ── Create / edit model ──────────────────────────────────────────────
+    with st.expander("➕ Create new model", expanded=not bool(saved_keys)):
+        new_model_id      = st.text_input("Model ID", value="GROWTH_70", key="new_model_id")
+        new_model_version = st.text_input("Version",  value="2024-Q2",   key="new_model_version")
+
+        st.caption("Enter target weights (must sum to 100%)")
+
+        default_df = pd.DataFrame(SAMPLE_WEIGHTS, columns=["Ticker", "Weight"])
+        weight_df = st.data_editor(
+            default_df,
+            num_rows="dynamic",
+            column_config={
+                "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                "Weight": st.column_config.NumberColumn(
+                    "Weight (%)",
+                    min_value=0.0001,
+                    max_value=100.0,
+                    step=0.01,
+                    format="%.4f",
+                ),
+            },
+            hide_index=True,
+            use_container_width=True,
+            key="weight_editor",
+        )
+
+        weight_sum = weight_df["Weight"].sum() if not weight_df.empty else 0.0
+        delta = weight_sum - 100.0
+        if abs(delta) < 0.05:
+            st.success(f"Weights sum: {weight_sum:.4f}% ✓")
+        else:
+            st.warning(f"Weights sum: {weight_sum:.4f}%  (need 100%,  {delta:+.4f}%)")
+
+        if st.button("Save model", use_container_width=True, type="primary", key="save_model_btn"):
+            try:
+                holdings = [
+                    ModelHolding(
+                        ticker=str(row["Ticker"]).strip().upper(),
+                        target_weight=float(row["Weight"]) / 100.0,
+                    )
+                    for _, row in weight_df.iterrows()
+                    if str(row["Ticker"]).strip() and str(row["Ticker"]).strip().lower() != "nan"
+                ]
+                new_model = ModelPortfolio(
+                    model_id=new_model_id.strip(),
+                    version=new_model_version.strip(),
+                    holdings=holdings,
+                )
+                label = f"{new_model.model_id} ({new_model.version})"
+                st.session_state.saved_models[label] = new_model
+                st.session_state.model = new_model
+                st.session_state.drift_reports = []
+                st.session_state.trade_results = []
+                st.success(f"Saved and activated: {label}")
+                st.rerun()
+            except ValueError as exc:
+                st.error(str(exc))
 
     st.divider()
 
@@ -473,89 +548,4 @@ for tab, drift_report in zip(tabs, drift_reports):
         # ── Trade table ──────────────────────────────────────────────────
         if trade_result is None:
             st.info("No trade result available for this account.")
-        elif not trade_result.trades and not trade_result.suppressed_trades:
-            st.success("No trades required — portfolio is within tolerance.")
-        else:
-            st.markdown("#### Trade instructions")
-
-            # Cash flow summary
-            cf1, cf2, cf3, cf4 = st.columns(4)
-            cf1.metric("Opening cash",  f"${trade_result.opening_cash:,.4f}")
-            cf2.metric("Sell proceeds", f"${trade_result.sell_proceeds:,.4f}")
-            cf3.metric("Buy cost",      f"${trade_result.buy_cost:,.4f}")
-            cf4.metric(
-                "Closing cash" if not trade_result.has_funding_shortfall else "⚠ Shortfall",
-                f"${trade_result.closing_cash:,.4f}",
-            )
-
-            if trade_result.has_funding_shortfall:
-                st.warning(
-                    f"Funding shortfall of ${abs(trade_result.closing_cash):,.4f}. "
-                    "Buy cost exceeds available cash. Adviser review required."
-                )
-
-            if trade_result.trades:
-                trade_rows = [
-                    {
-                        "Action":     t.action,
-                        "Ticker":     t.ticker,
-                        "Quantity":   round(t.quantity, 4),
-                        "Est. Value": round(t.estimated_value, 4),
-                    }
-                    for t in trade_result.trades
-                ]
-                trade_df = pd.DataFrame(trade_rows)
-
-                def _colour_action(val: str) -> str:
-                    if val == "BUY":
-                        return "color: #155724; font-weight: 600"
-                    if val == "SELL":
-                        return "color: #721c24; font-weight: 600"
-                    return ""
-
-                styled_trades = (
-                    trade_df
-                    .style
-                    .map(_colour_action, subset=["Action"])
-                    .format({
-                        "Quantity":   "{:.4f}",
-                        "Est. Value": "${:,.4f}",
-                    })
-                    .hide(axis="index")
-                )
-                st.dataframe(styled_trades, use_container_width=True, height=220)
-
-            if trade_result.suppressed_trades:
-                with st.expander(
-                    f"Suppressed trades ({len(trade_result.suppressed_trades)})"
-                ):
-                    sup_rows = [
-                        {
-                            "Action":    td.action,
-                            "Ticker":    td.ticker,
-                            "Raw value": round(td.raw_trade_value, 4),
-                            "Reason":    td.suppression_reason or "",
-                        }
-                        for td in trade_result.suppressed_trades
-                    ]
-                    st.dataframe(
-                        pd.DataFrame(sup_rows),
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-
-# ---------------------------------------------------------------------------
-# Download section — all trades as CSV
-# ---------------------------------------------------------------------------
-
-st.divider()
-st.markdown("#### Download")
-
-if all_trades:
-    col_dl1, col_dl2 = st.columns([2, 5])
-
-    with col_dl1:
-        tmp_dl = tempfile.mktemp(suffix=".csv")
-        export_trades_csv(all_trades, tmp_dl, include_metadata=True)
-        with open(tmp_dl, "rb") as f:
-            csv_bytes = f.rea
+  
