@@ -71,117 +71,21 @@ html, body, [class*="css"] {{
     max-width: 1200px;
 }}
 
-/* ── Sidebar ── */
-section[data-testid="stSidebar"] {{
-    background: {WHITE};
-    border-right: 1px solid {BORDER};
-    min-width: 200px !important;
-    max-width: 200px !important;
-}}
-section[data-testid="stSidebar"] > div {{ padding: 0 !important; }}
+/* ── Hide sidebar entirely ── */
+section[data-testid="stSidebar"] { display: none !important; }
 
-.sidebar-logo {{
-    padding: 1.75rem 1.25rem 1.25rem 1.25rem;
-    border-bottom: 1px solid {BORDER};
-    margin-bottom: 0.5rem;
-}}
-.sidebar-logo h2 {{
-    font-family: 'IBM Plex Sans', sans-serif;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: {NAVY};
-    margin: 0;
-    letter-spacing: 0.01em;
-}}
-.sidebar-logo p {{
-    font-size: 0.67rem;
-    color: {MUTED};
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    margin: 0.2rem 0 0 0;
-}}
-
-/* ── Sidebar nav links ── */
-.nav-link {{
-    display: block;
-    padding: 0.5rem 1.25rem;
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: {MUTED};
-    text-decoration: none;
-    cursor: pointer;
-    border-left: 2px solid transparent;
-    transition: color 0.12s, border-color 0.12s;
-    line-height: 1.5;
-    margin: 0.1rem 0;
-}}
-.nav-link:hover {{ color: {NAVY}; }}
-.nav-link.active {{
-    color: {BLUE};
-    border-left-color: {BLUE};
-    font-weight: 600;
-    background: {LIGHT};
-}}
-
-/* ── Sidebar nav buttons ── */
-section[data-testid="stSidebar"] div[data-testid="stButton"] {{
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-}}
-section[data-testid="stSidebar"] div[data-testid="stButton"] button {{
-    all: unset !important;
-    display: block !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    padding: 0.55rem 1.25rem !important;
+/* ── Tab styling ── */
+button[data-baseweb="tab"] {
     font-family: 'IBM Plex Sans', sans-serif !important;
     font-size: 0.82rem !important;
     font-weight: 500 !important;
-    color: {MUTED} !important;
-    text-align: left !important;
-    cursor: pointer !important;
-    border-left: 2px solid transparent !important;
-    background: transparent !important;
-    line-height: 1.5 !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-}}
-section[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {{
-    background: {OFF_W} !important;
-    color: {NAVY} !important;
-    border-left-color: {BORDER} !important;
-}}
-section[data-testid="stSidebar"] div[data-testid="stButton"] button p {{
-    margin: 0 !important;
-    text-align: left !important;
-    font-size: 0.82rem !important;
-    font-weight: 500 !important;
-    color: inherit !important;
-}}
-
-/* ── Sidebar status ── */
-.sidebar-status {{
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    background: {WHITE};
-    padding: 0.85rem 1.25rem;
-    border-top: 1px solid {BORDER};
-}}
-.sidebar-status-row {{
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.3rem;
-    font-size: 0.68rem;
-    font-family: 'IBM Plex Mono', monospace;
-}}
-.sidebar-status-row:last-child {{ margin-bottom: 0; }}
-.sidebar-status-label {{ color: {MUTED}; text-transform: uppercase; letter-spacing: 0.06em; }}
-.s-done   {{ color: {BLUE}; font-weight: 600; }}
-.s-warn   {{ color: #dc2626; font-weight: 600; }}
-.s-idle   {{ color: #c8cdd8; }}
+    color: #6b7280 !important;
+    padding: 0.6rem 1rem !important;
+}
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: #0f1f3d !important;
+    font-weight: 600 !important;
+}
 
 /* ── Page heading ── */
 .page-heading {{
@@ -379,7 +283,7 @@ div[data-testid="stDownloadButton"] button:hover {{
 /* ── Sticky download bar ── */
 .sticky-download {{
     position: fixed;
-    bottom: 0; left: 200px; right: 0;
+    bottom: 0; left: 0; right: 0;
     background: {WHITE};
     border-top: 1px solid {BORDER};
     padding: 0.75rem 2.5rem;
@@ -667,7 +571,6 @@ PREDEFINED_MODELS: list = [
 
 def _init_state() -> None:
     defaults: dict = {
-        "page":           "rebalance",
         "portfolios":     [],
         "model":          None,
         "saved_models":   {},
@@ -845,76 +748,27 @@ def _score_to_model(score: float, answers: dict) -> str:
 # Sidebar navigation
 # ---------------------------------------------------------------------------
 
-# Handle query param navigation
-qp = st.query_params.get("page", None)
-if qp and qp != st.session_state.page:
-    st.session_state.page = qp
+# ---------------------------------------------------------------------------
+# App header + tab navigation
+# ---------------------------------------------------------------------------
 
-with st.sidebar:
-    st.markdown(
-        '<div class="sidebar-logo">'
-        '<h2>Rebalancing Engine</h2>'
-        '<p>Portfolio &amp; Trade Management</p>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
+st.markdown(
+    '<div class="page-heading" style="margin-bottom:0.75rem;">' 
+    '<h1 style="font-size:1.5rem;margin-bottom:0;">Rebalancing Engine</h1>' 
+    '<div class="sub">Portfolio Drift &amp; Trade Generation</div>' 
+    '</div>',
+    unsafe_allow_html=True,
+)
 
-    pg = st.session_state.page
-    def _nav(pid, label):
-        cls = "nav-active" if pg == pid else "nav-inactive"
-        return (
-            f'<a class="nav-link {cls}" ' 
-            f'href="?page={pid}" target="_self">{label}</a>'
-        )
-
-    st.markdown(
-        '<div class="nav-block">' +
-        _nav("rebalance", "Rebalance") +
-        _nav("models",    "Models") +
-        _nav("profile",   "Client Profile") +
-        _nav("settings",  "Settings") +
-        '</div>',
-        unsafe_allow_html=True,
-    )
-
-    # Status panel — live session summary
-    model      = st.session_state.model
-    portfolios = st.session_state.portfolios
-    drift_reports = st.session_state.drift_reports
-    all_trades_s  = [t for tr in st.session_state.trade_results for t in tr.trades]
-
-    p_cls = "s-done" if portfolios else "s-idle"
-    p_val = f"{len(portfolios)} loaded" if portfolios else "—"
-    m_cls = "s-done" if model else "s-idle"
-    m_val = model.model_id if model else "—"
-
-    if drift_reports:
-        needs = sum(1 for dr in drift_reports if dr.requires_rebalance)
-        d_cls = "s-warn" if needs else "s-done"
-        d_val = f"{needs} flagged" if needs else "All in band"
-    else:
-        d_cls, d_val = "s-idle", "—"
-
-    t_cls = "s-done" if all_trades_s else "s-idle"
-    t_val = f"{len(all_trades_s)} trades" if all_trades_s else "—"
-
-    st.markdown(
-        f'<div class="sidebar-status">'
-        f'<div class="sidebar-status-row"><span class="sidebar-status-label">Portfolio</span><span class="{p_cls}">{p_val}</span></div>'
-        f'<div class="sidebar-status-row"><span class="sidebar-status-label">Model</span><span class="{m_cls}">{m_val}</span></div>'
-        f'<div class="sidebar-status-row"><span class="sidebar-status-label">Drift</span><span class="{d_cls}">{d_val}</span></div>'
-        f'<div class="sidebar-status-row"><span class="sidebar-status-label">Trades</span><span class="{t_cls}">{t_val}</span></div>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-
-page = st.session_state.page
+tab_rebalance, tab_models, tab_profile, tab_settings = st.tabs([
+    "Rebalance", "Models", "Client Profile", "Settings"
+])
 
 # ===========================================================================
 # PAGE: REBALANCE
 # ===========================================================================
 
-if page == "rebalance":
+with tab_rebalance:
 
     st.markdown(
         '<div class="page-heading">'
@@ -1311,7 +1165,7 @@ if page == "rebalance":
 # PAGE: MODELS
 # ===========================================================================
 
-elif page == "models":
+with tab_models:
 
     st.markdown(
         '<div class="page-heading">'
@@ -1444,7 +1298,7 @@ elif page == "models":
 # PAGE: CLIENT PROFILE
 # ===========================================================================
 
-elif page == "profile":
+with tab_profile:
 
     st.markdown(
         '<div class="page-heading">'
@@ -1629,7 +1483,7 @@ elif page == "profile":
 # PAGE: SETTINGS
 # ===========================================================================
 
-elif page == "settings":
+with tab_settings:
 
     st.markdown(
         '<div class="page-heading">'
