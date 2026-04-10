@@ -783,13 +783,12 @@ with tab_rebalance:
 
     # ── Step 1: Portfolio ────────────────────────────────────────────────
     has_portfolio = bool(st.session_state.portfolios)
-    st.markdown('<div class="card">', unsafe_allow_html=True)
     _card_header("1", "Load Client Portfolio",
                  "Upload a holdings CSV or use the built-in sample data.", done=has_portfolio)
 
     up1, up2 = st.columns([3, 2])
     with up1:
-        use_sample = st.checkbox("Use built-in sample data")
+        use_sample = st.checkbox("Use built-in sample data", value=True)
         if use_sample:
             if st.button("Load sample portfolio", type="primary"):
                 with tempfile.NamedTemporaryFile(mode="w", suffix=".csv",
@@ -849,13 +848,9 @@ with tab_rebalance:
             unsafe_allow_html=True,
         )
 
-    st.markdown('</div>', unsafe_allow_html=True)
-
     # ── Step 2: Model ────────────────────────────────────────────────────
     has_model = bool(st.session_state.model)
     saved_keys = list(st.session_state.saved_models.keys())
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
     _card_header("2", "Select Model Portfolio",
                  "Choose the target model to rebalance toward.", done=has_model)
 
@@ -907,11 +902,8 @@ with tab_rebalance:
                 hide_index=True,
             )
 
-    st.markdown('</div>', unsafe_allow_html=True)
-
     # ── Step 3: Run ──────────────────────────────────────────────────────
     has_results = bool(st.session_state.drift_reports)
-    st.markdown('<div class="card">', unsafe_allow_html=True)
     _card_header("3", "Run Rebalance", "Configure parameters and execute.", done=has_results)
 
     rs1, rs2, rs3, rs4 = st.columns(4)
@@ -958,15 +950,11 @@ with tab_rebalance:
             st.session_state.trade_results = t_results
         st.rerun()
 
-    st.markdown('</div>', unsafe_allow_html=True)
-
     if not ready:
         missing = []
         if not has_portfolio: missing.append("load a portfolio")
         if not has_model: missing.append("select a model")
         st.caption(f"Complete steps above to run: {' and '.join(missing)}.")
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
     # ── Step 4: Results ──────────────────────────────────────────────────
     drift_reports = st.session_state.drift_reports
@@ -986,8 +974,6 @@ with tab_rebalance:
     if drift_reports:
         gross_buy  = sum(t.estimated_value for t in all_trades if t.action == "BUY")
         gross_sell = sum(t.estimated_value for t in all_trades if t.action == "SELL")
-
-        st.markdown('<div class="card">', unsafe_allow_html=True)
         _card_header("4", "Results", "Review drift analysis and trade instructions.", done=bool(all_trades))
 
         # 3 clean summary metrics
@@ -1126,8 +1112,6 @@ with tab_rebalance:
                             use_container_width=True, hide_index=True,
                         )
 
-        st.markdown('</div>', unsafe_allow_html=True)
-
     # ── Sticky download bar ──────────────────────────────────────────────
     if all_trades and st.session_state.model:
         model = st.session_state.model
@@ -1161,7 +1145,6 @@ with tab_rebalance:
                 f'</div>',
                 unsafe_allow_html=True,
             )
-        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ===========================================================================
@@ -1182,7 +1165,6 @@ with tab_models:
     saved_keys = list(saved_models.keys())
 
     if saved_keys:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
         st.markdown("#### Saved Models")
 
         current_label = (
@@ -1240,9 +1222,6 @@ with tab_models:
                 f"v{st.session_state.model.version}  ·  "
                 f"{len(st.session_state.model.holdings)} holdings"
             )
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("#### Create New Model")
 
     nm1, nm2 = st.columns(2)
@@ -1294,8 +1273,6 @@ with tab_models:
             except ValueError as exc:
                 st.error(str(exc))
 
-    st.markdown('</div>', unsafe_allow_html=True)
-
 
 # ===========================================================================
 # PAGE: CLIENT PROFILE
@@ -1315,8 +1292,6 @@ with tab_profile:
     step = st.session_state.q_step
     answers = dict(st.session_state.q_answers)
 
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-
     col_cn, col_dt = st.columns([3, 2])
     with col_cn:
         client_name = st.text_input(
@@ -1331,11 +1306,8 @@ with tab_profile:
     st.progress(min(step, len(QUESTIONS)) / len(QUESTIONS),
                 text=f"Question {min(step+1, len(QUESTIONS))} of {len(QUESTIONS)}")
 
-    st.markdown('</div>', unsafe_allow_html=True)
-
     if step < len(QUESTIONS):
         q = QUESTIONS[step]
-        st.markdown('<div class="card">', unsafe_allow_html=True)
         st.markdown(f"**Section {q['section']} — {q['label']}**")
         st.markdown(f"### {q['text']}")
 
@@ -1360,8 +1332,6 @@ with tab_profile:
                 st.session_state.q_step = step + 1
                 st.rerun()
 
-        st.markdown('</div>', unsafe_allow_html=True)
-
     else:
         all_answered = all(q["id"] in answers for q in scored_qs)
         if not all_answered:
@@ -1374,8 +1344,6 @@ with tab_profile:
             display_model = base_model
             if "income" in flags: display_model += " — Income / Yield"
             if "esg"    in flags: display_model += " (ESG)"
-
-            st.markdown('<div class="card">', unsafe_allow_html=True)
             st.markdown("#### Assessment Result")
 
             level = RISK_LEVEL.get(base_model, 3)
@@ -1403,9 +1371,6 @@ with tab_profile:
                     + "<br>".join(f"• {c}" for c in conflicts)
                     + '</div>', unsafe_allow_html=True,
                 )
-
-            st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown('<div class="card">', unsafe_allow_html=True)
             st.markdown("#### Adviser Override")
             st.caption("Override the recommended model if required. A reason must be documented.")
 
@@ -1479,8 +1444,6 @@ with tab_profile:
                     f"then run the rebalance."
                 )
 
-            st.markdown('</div>', unsafe_allow_html=True)
-
 
 # ===========================================================================
 # PAGE: SETTINGS
@@ -1499,8 +1462,6 @@ with tab_settings:
     locked = st.session_state.weights_locked
     if locked:
         st.error("Weightings are locked by the practice principal.")
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("#### Section Weights")
     st.caption(
         f"Adjust how much each section contributes to the final risk score. "
@@ -1556,10 +1517,6 @@ with tab_settings:
                     "note": "Restored to default equal weighting"
                 })
                 st.success("Reset."); st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("#### Principal Controls")
     st.caption("Lock weightings to prevent advisers from making changes.")
 
@@ -1569,10 +1526,6 @@ with tab_settings:
     else:
         if st.button("🔒 Lock Weightings"):
             st.session_state.weights_locked = True; st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("#### Change Log")
     if st.session_state.weight_log:
         log_rows = []
@@ -1583,4 +1536,3 @@ with tab_settings:
         st.dataframe(pd.DataFrame(log_rows), use_container_width=True, hide_index=True)
     else:
         st.caption("No changes recorded yet.")
-    st.markdown('</div>', unsafe_allow_html=True)
