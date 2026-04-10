@@ -1,12 +1,10 @@
 """
 app.py — Portfolio Rebalancing Engine
-Focused rebalancing tool with optional client profiling.
+Adviser-grade rebalancing tool with optional client profiling.
 
-Tab structure:
-    1. Rebalance      — Core workflow: model → portfolio → drift → trades → download
-    2. Models         — Create and manage saved model portfolios
-    3. Client Profile — Optional risk questionnaire
-    4. Settings       — Admin: weighting config, change log, lock
+Navigation: persistent left sidebar
+Layout:     card-based sections
+Colours:    deep navy (#0f1f3d) + blue accent (#2754F5)
 """
 
 from __future__ import annotations
@@ -16,7 +14,7 @@ import io
 import os
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import pandas as pd
 import streamlit as st
@@ -30,284 +28,432 @@ from portfolio import load_portfolios
 from trades import TradeConfig, generate_trades
 
 # ---------------------------------------------------------------------------
-# Page config — must be first Streamlit call
+# Page config
 # ---------------------------------------------------------------------------
 
 st.set_page_config(
     page_title="Rebalancing Engine",
     page_icon="⚖",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
+
+# ---------------------------------------------------------------------------
+# Design tokens
+# ---------------------------------------------------------------------------
+NAVY   = "#0f1f3d"
+BLUE   = "#2754F5"
+BLUE_L = "#dce9ff"
+GOLD   = "#2754F5"   # accent = blue per spec
+OFF_W  = "#f4f6fb"
+WHITE  = "#ffffff"
+BORDER = "#e2e8f0"
+MUTED  = "#64748b"
+TEXT   = "#1e293b"
 
 # ---------------------------------------------------------------------------
 # CSS
 # ---------------------------------------------------------------------------
 
-st.markdown("""
+st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
 
-/* ── Global ── */
-html, body, [class*="css"] {
+/* ── Reset & globals ── */
+html, body, [class*="css"] {{
     font-family: 'IBM Plex Sans', sans-serif;
-}
+    color: {TEXT};
+}}
+.stApp {{ background: {OFF_W}; }}
+.block-container {{ padding: 1.5rem 2rem 4rem 2rem !important; max-width: 1280px; }}
 
-/* ── App background: off-white, not blinding white ── */
-.stApp { background-color: #f5f6f8; }
-section.main > div { background-color: #f5f6f8; }
-
-/* ── Header bar: deep navy strip across top ── */
-.app-header {
-    background: #0f1f3d;
-    color: #f0f4ff;
-    padding: 1rem 1.5rem 0.85rem 1.5rem;
-    margin: -1rem -1rem 1.5rem -1rem;
+/* ── Sidebar nav ── */
+section[data-testid="stSidebar"] {{
+    background: {NAVY};
+    min-width: 220px !important;
+    max-width: 220px !important;
+    border-right: none;
+    padding-top: 0;
+}}
+section[data-testid="stSidebar"] > div {{ padding: 0; }}
+.sidebar-logo {{
+    padding: 1.5rem 1.25rem 1rem 1.25rem;
+    border-bottom: 1px solid #1e3a6e;
+    margin-bottom: 0.5rem;
+}}
+.sidebar-logo h2 {{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1rem;
+    font-weight: 600;
+    color: {WHITE};
+    margin: 0;
+    letter-spacing: 0.02em;
+}}
+.sidebar-logo p {{
+    font-size: 0.65rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0.25rem 0 0 0;
+}}
+.nav-item {{
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.6rem 1.25rem;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    font-size: 0.84rem;
+    font-weight: 500;
+    color: #94a3b8;
+    transition: all 0.15s ease;
+    text-decoration: none;
+}}
+.nav-item:hover {{ color: {WHITE}; background: rgba(255,255,255,0.05); }}
+.nav-item.active {{
+    color: {WHITE};
+    border-left-color: {BLUE};
+    background: rgba(39,84,245,0.12);
+}}
+.nav-item .nav-icon {{ font-size: 1rem; width: 20px; text-align: center; }}
+.nav-section-label {{
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #334155;
+    padding: 1rem 1.25rem 0.3rem 1.25rem;
+    font-family: 'IBM Plex Mono', monospace;
+}}
+/* ── Status panel in sidebar ── */
+.sidebar-status {{
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #0a1628;
+    padding: 0.85rem 1.25rem;
+    border-top: 1px solid #1e3a6e;
+}}
+.sidebar-status-row {{
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 3px solid #c9a84c;
-}
-.app-header h1 {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 1.15rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    color: #f0f4ff;
-    margin: 0;
-}
-.app-header .tagline {
-    font-size: 0.75rem;
-    color: #94a3b8;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    margin-top: 0.15rem;
-}
+    margin-bottom: 0.4rem;
+    font-size: 0.72rem;
+}}
+.sidebar-status-label {{ color: #475569; text-transform: uppercase; letter-spacing: 0.06em; font-family: 'IBM Plex Mono', monospace; }}
+.s-done  {{ color: {BLUE}; font-weight: 600; }}
+.s-warn  {{ color: #f87171; font-weight: 600; }}
+.s-idle  {{ color: #334155; }}
 
-/* ── Gold accent divider ── */
-.gold-rule {
-    height: 2px;
-    background: linear-gradient(90deg, #c9a84c 0%, transparent 100%);
-    border: none;
-    margin: 1.25rem 0;
-}
-
-/* ── Status bar: structured progress strip ── */
-.status-bar {
-    background: #0f1f3d;
-    border-radius: 6px;
-    padding: 0.65rem 1.25rem;
+/* ── Page header ── */
+.page-header {{
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
     margin-bottom: 1.5rem;
-    display: flex;
-    gap: 0;
-    align-items: center;
-    font-size: 0.78rem;
-}
-.status-item {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0 1.25rem;
-    border-right: 1px solid #1e3a6e;
-    color: #94a3b8;
-}
-.status-item:first-child { padding-left: 0; }
-.status-item:last-child  { border-right: none; }
-.status-label { color: #64748b; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
-.status-done  { color: #c9a84c; font-weight: 600; }
-.status-pending { color: #4a5568; }
-.status-warn  { color: #f87171; font-weight: 600; }
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid {BLUE};
+}}
+.page-header h1 {{
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: {NAVY};
+    margin: 0;
+}}
+.page-header .sub {{
+    font-size: 0.8rem;
+    color: {MUTED};
+    margin-top: 0.2rem;
+}}
 
-/* ── Step headers ── */
-.step-header {
+/* ── Cards ── */
+.card {{
+    background: {WHITE};
+    border: 1px solid {BORDER};
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 1px 3px rgba(15,31,61,0.06);
+    animation: fadeIn 0.3s ease;
+}}
+.card-header {{
     display: flex;
     align-items: center;
-    gap: 0.85rem;
-    margin: 1.5rem 0 0.6rem 0;
-    padding-bottom: 0.6rem;
-    border-bottom: 1px solid #e2e8f0;
-}
-.step-num {
-    background: #0f1f3d;
-    color: #c9a84c;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid {BORDER};
+}}
+.card-step {{
+    background: {NAVY};
+    color: {BLUE};
+    border: 1.5px solid {BLUE};
     border-radius: 50%;
-    width: 28px;
-    height: 28px;
+    width: 26px; height: 26px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.72rem;
-    font-weight: 700;
-    flex-shrink: 0;
-    font-family: 'IBM Plex Mono', monospace;
-    border: 1.5px solid #c9a84c;
-}
-.step-num-done {
-    background: #c9a84c;
-    color: #0f1f3d;
-    border-radius: 50%;
-    width: 28px;
-    height: 28px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.72rem;
-    font-weight: 700;
-    flex-shrink: 0;
-    font-family: 'IBM Plex Mono', monospace;
-}
-.step-title    { font-size: 0.95rem; font-weight: 600; color: #0f1f3d; }
-.step-subtitle { font-size: 0.78rem; color: #64748b; margin-top: 0.1rem; }
-
-/* ── Status badges ── */
-.badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 2px;
     font-size: 0.7rem;
     font-weight: 700;
-    letter-spacing: 0.07em;
+    flex-shrink: 0;
+    font-family: 'IBM Plex Mono', monospace;
+}}
+.card-step-done {{
+    background: {BLUE};
+    color: {WHITE};
+    border-radius: 50%;
+    width: 26px; height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}}
+.card-title {{ font-size: 0.95rem; font-weight: 600; color: {NAVY}; }}
+.card-subtitle {{ font-size: 0.75rem; color: {MUTED}; margin-top: 0.1rem; }}
+
+/* ── Metric cards ── */
+div[data-testid="metric-container"] {{
+    background: {WHITE};
+    border: 1px solid {BORDER};
+    border-top: 3px solid {BLUE};
+    border-radius: 6px;
+    padding: 1rem 1.25rem 0.85rem !important;
+    min-height: 82px;
+    box-shadow: 0 1px 2px rgba(15,31,61,0.04);
+}}
+div[data-testid="metric-container"] label {{
+    font-size: 0.68rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: {MUTED} !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-weight: 500 !important;
+}}
+div[data-testid="metric-container"] [data-testid="stMetricValue"] {{
+    font-size: 1.5rem !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    color: {NAVY} !important;
+    font-weight: 600 !important;
+}}
+
+/* ── Status pills (drift table) ── */
+.pill {{
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 2px 9px;
+    border-radius: 20px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     font-family: 'IBM Plex Mono', monospace;
-}
-.badge-over  { background: #fef3c7; color: #92400e; border-left: 3px solid #d97706; }
-.badge-under { background: #dbeafe; color: #1e3a8a; border-left: 3px solid #2563eb; }
-.badge-divest{ background: #fee2e2; color: #7f1d1d; border-left: 3px solid #dc2626; }
-.badge-ok    { background: #f0fdf4; color: #14532d; border-left: 3px solid #16a34a; }
+    white-space: nowrap;
+}}
+.pill-over  {{ background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }}
+.pill-under {{ background: #dbeafe; color: #1e3a8a; border: 1px solid #93c5fd; }}
+.pill-divest{{ background: #fee2e2; color: #7f1d1d; border: 1px solid #fca5a5; }}
+.pill-ok    {{ background: #f0fdf4; color: #14532d; border: 1px solid #86efac; }}
 
-/* ── Drift row highlighting ── */
-.drift-row-over   { border-left: 4px solid #d97706 !important; }
-.drift-row-under  { border-left: 4px solid #2563eb !important; }
-.drift-row-divest { border-left: 4px solid #dc2626 !important; }
+/* ── Tables ── */
+thead tr th {{
+    background: {NAVY} !important;
+    color: #94a3b8 !important;
+    font-size: 0.67rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-family: 'IBM Plex Mono', monospace !important;
+    border-bottom: 2px solid {BLUE} !important;
+    padding: 0.6rem 0.75rem !important;
+}}
+tbody tr td {{
+    font-size: 0.83rem !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    padding: 0.55rem 0.75rem !important;
+}}
+tbody tr:hover td {{ background: #f8fafc !important; }}
+
+/* ── Run button ── */
+.run-btn-wrap > div > button {{
+    width: 100% !important;
+    height: 52px !important;
+    font-size: 1rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.04em !important;
+    background: {BLUE} !important;
+    border: none !important;
+    border-radius: 6px !important;
+    color: white !important;
+    transition: background 0.2s ease, transform 0.1s ease !important;
+}}
+.run-btn-wrap > div > button:hover {{
+    background: #1a40d9 !important;
+    transform: translateY(-1px);
+}}
+.run-btn-wrap > div > button:disabled {{
+    background: #94a3b8 !important;
+    transform: none;
+    cursor: not-allowed !important;
+}}
+
+/* ── Sticky download bar ── */
+.sticky-download {{
+    position: fixed;
+    bottom: 0;
+    left: 220px;
+    right: 0;
+    background: {NAVY};
+    border-top: 2px solid {BLUE};
+    padding: 0.75rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 999;
+    box-shadow: 0 -4px 20px rgba(15,31,61,0.2);
+    animation: slideUp 0.3s ease;
+}}
+.sticky-download .dl-summary {{
+    color: #94a3b8;
+    font-size: 0.78rem;
+    font-family: 'IBM Plex Mono', monospace;
+}}
+.sticky-download .dl-summary strong {{ color: {WHITE}; }}
+
+/* ── Download button ── */
+div[data-testid="stDownloadButton"] button {{
+    background: {BLUE} !important;
+    color: {WHITE} !important;
+    font-weight: 700 !important;
+    border: none !important;
+    border-radius: 4px !important;
+    font-family: 'IBM Plex Sans', sans-serif !important;
+    padding: 0.5rem 1.25rem !important;
+    transition: background 0.2s ease !important;
+}}
+div[data-testid="stDownloadButton"] button:hover {{
+    background: #1a40d9 !important;
+}}
+
+/* ── Primary buttons ── */
+div[data-testid="stButton"] button[kind="primary"] {{
+    background: {NAVY};
+    border: none;
+    border-bottom: 2px solid {BLUE};
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    border-radius: 4px;
+    transition: background 0.15s ease;
+}}
+div[data-testid="stButton"] button[kind="primary"]:hover {{
+    background: #1e3a6e;
+}}
+
+/* ── Account accordion ── */
+.account-card {{
+    background: {WHITE};
+    border: 1px solid {BORDER};
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(15,31,61,0.05);
+    animation: fadeIn 0.25s ease;
+}}
+.account-header {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 1.25rem;
+    background: {WHITE};
+    cursor: pointer;
+    border-bottom: 1px solid transparent;
+}}
+.account-header:hover {{ background: #f8fafc; }}
+.account-header.flagged {{ border-left: 4px solid {BLUE}; }}
+.account-header.ok      {{ border-left: 4px solid #16a34a; }}
+.account-hin  {{ font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: {NAVY}; font-size: 0.9rem; }}
+.account-meta {{ font-size: 0.75rem; color: {MUTED}; margin-top: 0.15rem; }}
+.account-pills {{ display: flex; gap: 0.5rem; align-items: center; }}
+.account-body {{ padding: 1.25rem 1.5rem; border-top: 1px solid {BORDER}; }}
+
+/* ── Model description tooltip ── */
+.model-desc {{
+    background: #f8fafc;
+    border: 1px solid {BORDER};
+    border-left: 3px solid {BLUE};
+    border-radius: 4px;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.78rem;
+    color: {MUTED};
+    margin-top: 0.5rem;
+    animation: fadeIn 0.2s ease;
+}}
+.model-desc strong {{ color: {NAVY}; }}
+
+/* ── Empty states ── */
+.empty-state {{
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: {MUTED};
+    border: 1.5px dashed #cbd5e1;
+    border-radius: 8px;
+    margin: 0.5rem 0;
+    background: {WHITE};
+}}
+.empty-state .icon {{ font-size: 2rem; margin-bottom: 0.5rem; }}
+.empty-state .msg  {{ font-size: 0.9rem; color: {TEXT}; font-weight: 500; }}
+.empty-state .hint {{ font-size: 0.78rem; color: {MUTED}; margin-top: 0.3rem; }}
 
 /* ── Conflict box ── */
-.conflict-box {
+.conflict-box {{
     background: #fffbeb;
     border: 1px solid #f59e0b;
     border-left: 4px solid #d97706;
     border-radius: 4px;
-    padding: 0.85rem 1.1rem;
-    margin: 0.85rem 0;
-    font-size: 0.875rem;
+    padding: 0.85rem 1rem;
+    margin: 0.75rem 0;
+    font-size: 0.85rem;
     color: #451a03;
-}
+}}
 
-/* ── Empty state ── */
-.empty-state {
-    text-align: center;
-    padding: 2.5rem 1rem;
-    color: #94a3b8;
-    border: 1.5px dashed #cbd5e1;
-    border-radius: 8px;
-    margin: 1rem 0;
-}
-.empty-state .icon { font-size: 2rem; margin-bottom: 0.5rem; }
-.empty-state .msg  { font-size: 0.9rem; color: #64748b; }
-.empty-state .hint { font-size: 0.78rem; color: #94a3b8; margin-top: 0.25rem; }
-
-/* ── Metric cards: larger, more breathing room ── */
-div[data-testid="metric-container"] {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-top: 3px solid #0f1f3d;
-    border-radius: 4px;
-    padding: 1rem 1.25rem 0.85rem !important;
-    min-height: 80px;
-}
-div[data-testid="metric-container"] label {
-    font-size: 0.7rem !important;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: #64748b !important;
-    font-family: 'IBM Plex Mono', monospace !important;
-}
-div[data-testid="metric-container"] [data-testid="stMetricValue"] {
-    font-size: 1.4rem !important;
-    font-family: 'IBM Plex Mono', monospace !important;
-    color: #0f1f3d !important;
-    font-weight: 600 !important;
-}
-
-/* ── Table: tighter, financial-grade ── */
-thead tr th {
-    background-color: #0f1f3d !important;
-    color: #94a3b8 !important;
-    font-size: 0.68rem !important;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    font-family: 'IBM Plex Mono', monospace !important;
-    border-bottom: 2px solid #c9a84c !important;
-}
-tbody tr td {
-    font-size: 0.84rem !important;
-    font-family: 'IBM Plex Mono', monospace !important;
-    border-bottom: 1px solid #f1f5f9 !important;
-}
-tbody tr:hover td { background-color: #f8fafc !important; }
-
-/* ── Buttons ── */
-div[data-testid="stButton"] button[kind="primary"] {
-    background: #0f1f3d;
-    border: none;
-    border-bottom: 2px solid #c9a84c;
-    font-family: 'IBM Plex Sans', sans-serif;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    border-radius: 3px;
-}
-div[data-testid="stButton"] button[kind="primary"]:hover {
-    background: #1e3a6e;
-    border-bottom-color: #f0c060;
-}
-div[data-testid="stDownloadButton"] button {
-    background: #c9a84c;
-    color: #0f1f3d;
-    font-weight: 700;
-    border: none;
-    border-radius: 3px;
-    font-family: 'IBM Plex Sans', sans-serif;
-}
-div[data-testid="stDownloadButton"] button:hover {
-    background: #b8943e;
-    color: #0f1f3d;
-}
-
-/* ── Section card wrapper ── */
-.section-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    padding: 1.25rem 1.5rem;
-    margin-bottom: 1rem;
-}
-
-/* ── Tab style ── */
-button[data-baseweb="tab"] {
+/* ── Tabs (inner account tabs removed, using expanders instead) ── */
+button[data-baseweb="tab"] {{
     font-family: 'IBM Plex Sans', sans-serif !important;
     font-weight: 500 !important;
     font-size: 0.875rem !important;
-    color: #475569 !important;
-}
-button[data-baseweb="tab"][aria-selected="true"] {
-    color: #0f1f3d !important;
-    border-bottom-color: #c9a84c !important;
-}
+}}
+button[data-baseweb="tab"][aria-selected="true"] {{
+    color: {NAVY} !important;
+    border-bottom-color: {BLUE} !important;
+}}
 
-/* ── Sidebar gone ── */
-section[data-testid="stSidebar"] { display: none; }
+/* ── Animations ── */
+@keyframes fadeIn {{
+    from {{ opacity: 0; transform: translateY(6px); }}
+    to   {{ opacity: 1; transform: translateY(0); }}
+}}
+@keyframes slideUp {{
+    from {{ transform: translateY(100%); }}
+    to   {{ transform: translateY(0); }}
+}}
+@keyframes countUp {{
+    from {{ opacity: 0; }}
+    to   {{ opacity: 1; }}
+}}
 
-/* ── Generous section spacing ── */
-.block-container { padding-top: 0 !important; }
-div[data-testid="stVerticalBlock"] > div { margin-bottom: 0.15rem; }
-hr { border-color: #e2e8f0; margin: 1.5rem 0; }
+/* ── Accessibility: focus rings ── */
+button:focus-visible {{
+    outline: 3px solid {BLUE} !important;
+    outline-offset: 2px !important;
+}}
 
-/* ── Risk scale ── */
-.risk-marker {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.7rem;
-    color: #64748b;
-    margin-top: 0.2rem;
-}
+/* ── Spacing ── */
+hr {{ border-color: {BORDER}; margin: 1.25rem 0; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -317,26 +463,33 @@ hr { border-color: #e2e8f0; margin: 1.5rem 0; }
 
 QUESTIONNAIRE_VERSION = "1.0"
 
+MODEL_DESCRIPTIONS = {
+    "CONSERVATIVE":   ("30% growth / 70% defensive", "Capital preservation. Bonds and cash-like ETFs dominate.", 1),
+    "MODERATE":       ("50% growth / 50% defensive", "Balanced income and growth across Australian and global assets.", 2),
+    "GROWTH":         ("70% growth / 30% defensive", "Long-term wealth accumulation with meaningful defensive buffer.", 3),
+    "HIGH_GROWTH":    ("90% growth / 10% defensive", "Maximum equity exposure. Long time horizon required.", 4),
+    "AGGRESSIVE":     ("100% growth",                "Pure equity. No defensive allocation. High volatility expected.", 5),
+    "INCOME":         ("Income focused",             "High-dividend stocks, LICs, and fixed interest for regular income.", 2),
+    "ESG":            ("Ethical / screened growth",  "Excludes fossil fuels, weapons, tobacco. ESG-screened ETFs only.", 3),
+    "AUSTRALIAN_EQ":  ("100% Australian equities",  "Direct ASX blue-chip exposure. No international or fixed income.", 4),
+    "INDEX_PASSIVE":  ("Low-cost index",             "Three-fund portfolio. Broad market exposure at minimum cost.", 3),
+}
+
 QUESTIONS = [
     {
         "id": "Q1", "section": "A", "label": "Time Horizon",
         "text": "When do you expect to start drawing on this investment?",
         "options": [
-            ("Less than 2 years", 1),
-            ("2–5 years", 2),
-            ("5–10 years", 3),
-            ("10–15 years", 4),
-            ("More than 15 years", 5),
+            ("Less than 2 years", 1), ("2–5 years", 2), ("5–10 years", 3),
+            ("10–15 years", 4), ("More than 15 years", 5),
         ],
     },
     {
         "id": "Q2", "section": "B", "label": "Risk Tolerance",
         "text": "If your portfolio lost 20% of its value in a market downturn, what would you most likely do?",
         "options": [
-            ("Sell everything immediately", 1),
-            ("Sell some to reduce exposure", 2),
-            ("Do nothing and wait", 3),
-            ("Buy a little more while prices are low", 4),
+            ("Sell everything immediately", 1), ("Sell some to reduce exposure", 2),
+            ("Do nothing and wait", 3), ("Buy a little more while prices are low", 4),
             ("Significantly increase my investment", 5),
         ],
     },
@@ -355,8 +508,7 @@ QUESTIONS = [
         "id": "Q4", "section": "C", "label": "Risk Capacity",
         "text": "If you lost this entire investment, how would it affect your lifestyle?",
         "options": [
-            ("Severely — I depend on it", 1),
-            ("Significantly — it would cause real hardship", 2),
+            ("Severely — I depend on it", 1), ("Significantly — it would cause real hardship", 2),
             ("Moderately — I would need to adjust my plans", 3),
             ("Mildly — I have other assets to fall back on", 4),
             ("Minimally — this is discretionary money", 5),
@@ -366,10 +518,8 @@ QUESTIONS = [
         "id": "Q5", "section": "D", "label": "Income Stability",
         "text": "How would you describe your current and expected future income?",
         "options": [
-            ("Unstable or uncertain", 1),
-            ("Variable with some uncertainty", 2),
-            ("Stable but could change", 3),
-            ("Stable and likely to continue", 4),
+            ("Unstable or uncertain", 1), ("Variable with some uncertainty", 2),
+            ("Stable but could change", 3), ("Stable and likely to continue", 4),
             ("Very stable or I have multiple income sources", 5),
         ],
     },
@@ -388,10 +538,8 @@ QUESTIONS = [
         "id": "Q7", "section": "F", "label": "Goals",
         "text": "What is the primary purpose of this investment?",
         "options": [
-            ("Preserve my capital above all else", 1),
-            ("Generate regular income", 2),
-            ("Balanced mix of income and growth", 3),
-            ("Grow my wealth over the long term", 4),
+            ("Preserve my capital above all else", 1), ("Generate regular income", 2),
+            ("Balanced mix of income and growth", 3), ("Grow my wealth over the long term", 4),
             ("Maximise long-term growth, I do not need income", 5),
         ],
         "flags": {1: "income"},
@@ -400,8 +548,7 @@ QUESTIONS = [
         "id": "Q8", "section": "F", "label": "ESG Preferences",
         "text": "Do you have any ethical or ESG investment preferences?",
         "options": [
-            ("No preference", 0),
-            ("Somewhat important", 0),
+            ("No preference", 0), ("Somewhat important", 0),
             ("Very important — I want to exclude certain industries", 0),
         ],
         "flags": {1: "esg", 2: "esg"},
@@ -410,171 +557,61 @@ QUESTIONS = [
 ]
 
 SCORE_MAP = [
-    (6,  10, "Conservative"),
-    (11, 16, "Moderate / Balanced"),
-    (17, 22, "Growth"),
-    (23, 28, "High Growth"),
-    (29, 30, "Aggressive"),
+    (6, 10, "Conservative"), (11, 16, "Moderate / Balanced"),
+    (17, 22, "Growth"), (23, 28, "High Growth"), (29, 30, "Aggressive"),
 ]
-
 RISK_LEVEL = {
-    "Conservative":       1,
-    "Moderate / Balanced": 2,
-    "Growth":             3,
-    "High Growth":        4,
-    "Aggressive":         5,
+    "Conservative": 1, "Moderate / Balanced": 2, "Growth": 3,
+    "High Growth": 4, "Aggressive": 5,
 }
-
 CONFLICT_RULES = [
-    ("Q2", [0, 1], "Q7", [3, 4],
-     "Low risk tolerance (Q2) conflicts with high growth goals (Q7)."),
-    ("Q1", [0], "Q7", [3, 4],
-     "Short time horizon (Q1) conflicts with growth-oriented goals (Q7)."),
-    ("Q4", [0], None, None,
-     "Client is financially dependent on this investment (Q4). Consider capping at Conservative."),
+    ("Q2", [0,1], "Q7", [3,4], "Low risk tolerance (Q2) conflicts with high growth goals (Q7)."),
+    ("Q1", [0], "Q7", [3,4], "Short time horizon (Q1) conflicts with growth-oriented goals (Q7)."),
+    ("Q4", [0], None, None, "Client is financially dependent on this investment (Q4). Consider capping at Conservative."),
 ]
-
-DEFAULT_WEIGHTS = {"A": 1.0, "B": 1.0, "C": 1.0, "D": 1.0, "E": 1.0, "F": 1.0}
+DEFAULT_WEIGHTS = {"A":1.0,"B":1.0,"C":1.0,"D":1.0,"E":1.0,"F":1.0}
 WEIGHT_MIN = 0.5
 WEIGHT_MAX = 2.0
-
 SECTION_LABELS = {
-    "A": "Time Horizon",
-    "B": "Risk Tolerance",
-    "C": "Risk Capacity",
-    "D": "Income Stability",
-    "E": "Investment Experience",
-    "F": "Goals",
+    "A":"Time Horizon","B":"Risk Tolerance","C":"Risk Capacity",
+    "D":"Income Stability","E":"Investment Experience","F":"Goals",
 }
 
 SAMPLE_CSV = """\
 account_id,ticker,quantity,price,cash_balance
-HIN001,CBA,420.0000,121.5000,5000.0000
-HIN001,BHP,180.0000,46.2000,5000.0000
-HIN001,CSL,55.2500,289.0000,5000.0000
-HIN001,WES,90.0000,68.5000,5000.0000
-HIN001,ANZ,200.0000,29.4000,5000.0000
-HIN002,CBA,600.0000,121.5000,8500.0000
-HIN002,BHP,300.0000,46.2000,8500.0000
-HIN002,CSL,90.7500,289.0000,8500.0000
-HIN002,WES,220.0000,68.5000,8500.0000
-HIN002,ANZ,410.0000,29.4000,8500.0000
-HIN002,WBC,350.0000,29.1000,8500.0000
-HIN003,CBA,200.0000,121.5000,2000.0000
-HIN003,BHP,150.3300,46.2000,2000.0000
-HIN003,CSL,0.0000,289.0000,2000.0000
-HIN003,WES,0.0000,68.5000,2000.0000
-HIN003,ANZ,0.0000,29.4000,2000.0000
+HIN001,VAS,480.0000,104.00,3500.0000
+HIN001,VGS,265.0000,140.50,3500.0000
+HIN001,VAF,280.0000,47.80,3500.0000
+HIN001,AGG,100.0000,110.30,3500.0000
+HIN001,VHY,0.0000,72.40,3500.0000
+HIN002,VAS,480.0000,104.00,5000.0000
+HIN002,VGS,280.0000,140.50,5000.0000
+HIN002,VAF,420.0000,47.80,5000.0000
+HIN002,AGG,320.0000,110.30,5000.0000
+HIN002,VHY,120.0000,72.40,5000.0000
+HIN002,NDQ,250.0000,48.60,5000.0000
+HIN003,VAS,120.0000,104.00,25000.0000
+HIN003,VGS,80.0000,140.50,25000.0000
+HIN003,VAF,100.0000,47.80,25000.0000
+HIN003,AGG,0.0000,110.30,25000.0000
+HIN003,VHY,0.0000,72.40,25000.0000
 """
 
 SAMPLE_MODEL_WEIGHTS = [
-    ("CBA", 25.0), ("BHP", 20.0), ("CSL", 15.0),
-    ("WES", 15.0), ("ANZ", 12.0), ("MQG", 8.0), ("FMG", 5.0),
+    ("CBA",25.0),("BHP",20.0),("CSL",15.0),
+    ("WES",15.0),("ANZ",12.0),("MQG",8.0),("FMG",5.0),
 ]
 
-# ---------------------------------------------------------------------------
-# Predefined model portfolios
-# All weights sum to 100%. ETF-based where appropriate for wrap platform use.
-# ---------------------------------------------------------------------------
-
 PREDEFINED_MODELS: list = [
-    {
-        "model_id": "CONSERVATIVE",
-        "version":  "2024-Q2",
-        "holdings": [
-            ("AGG",  40.0),
-            ("VAF",  20.0),
-            ("VAS",  20.0),
-            ("VGS",  10.0),
-            ("VHY",  10.0),
-        ],
-    },
-    {
-        "model_id": "MODERATE",
-        "version":  "2024-Q2",
-        "holdings": [
-            ("VAS",  25.0),
-            ("VGS",  25.0),
-            ("VAF",  25.0),
-            ("AGG",  15.0),
-            ("VHY",  10.0),
-        ],
-    },
-    {
-        "model_id": "GROWTH",
-        "version":  "2024-Q2",
-        "holdings": [
-            ("VAS",  30.0),
-            ("VGS",  25.0),
-            ("VGE",  15.0),
-            ("VAF",  20.0),
-            ("VHY",  10.0),
-        ],
-    },
-    {
-        "model_id": "HIGH_GROWTH",
-        "version":  "2024-Q2",
-        "holdings": [
-            ("VAS",  30.0),
-            ("VGS",  30.0),
-            ("VGE",  15.0),
-            ("NDQ",  15.0),
-            ("VHY",  10.0),
-        ],
-    },
-    {
-        "model_id": "AGGRESSIVE",
-        "version":  "2024-Q2",
-        "holdings": [
-            ("VAS",  30.0),
-            ("VGS",  30.0),
-            ("NDQ",  20.0),
-            ("VGE",  20.0),
-        ],
-    },
-    {
-        "model_id": "INCOME",
-        "version":  "2024-Q2",
-        "holdings": [
-            ("VHY",  30.0),
-            ("VAF",  25.0),
-            ("AFI",  15.0),
-            ("ARG",  15.0),
-            ("VAP",  15.0),
-        ],
-    },
-    {
-        "model_id": "ESG",
-        "version":  "2024-Q2",
-        "holdings": [
-            ("ETHI", 35.0),
-            ("FAIR", 30.0),
-            ("VESG", 20.0),
-            ("VBND", 15.0),
-        ],
-    },
-    {
-        "model_id": "AUSTRALIAN_EQ",
-        "version":  "2024-Q2",
-        "holdings": [
-            ("CBA",  25.0),
-            ("BHP",  20.0),
-            ("CSL",  15.0),
-            ("WES",  15.0),
-            ("ANZ",  12.0),
-            ("MQG",   8.0),
-            ("FMG",   5.0),
-        ],
-    },
-    {
-        "model_id": "INDEX_PASSIVE",
-        "version":  "2024-Q2",
-        "holdings": [
-            ("VAS",  40.0),
-            ("VGS",  40.0),
-            ("VAF",  20.0),
-        ],
-    },
+    {"model_id":"CONSERVATIVE","version":"2024-Q2","holdings":[("AGG",40.0),("VAF",20.0),("VAS",20.0),("VGS",10.0),("VHY",10.0)]},
+    {"model_id":"MODERATE","version":"2024-Q2","holdings":[("VAS",25.0),("VGS",25.0),("VAF",25.0),("AGG",15.0),("VHY",10.0)]},
+    {"model_id":"GROWTH","version":"2024-Q2","holdings":[("VAS",30.0),("VGS",25.0),("VGE",15.0),("VAF",20.0),("VHY",10.0)]},
+    {"model_id":"HIGH_GROWTH","version":"2024-Q2","holdings":[("VAS",30.0),("VGS",30.0),("VGE",15.0),("NDQ",15.0),("VHY",10.0)]},
+    {"model_id":"AGGRESSIVE","version":"2024-Q2","holdings":[("VAS",30.0),("VGS",30.0),("NDQ",20.0),("VGE",20.0)]},
+    {"model_id":"INCOME","version":"2024-Q2","holdings":[("VHY",30.0),("VAF",25.0),("AFI",15.0),("ARG",15.0),("VAP",15.0)]},
+    {"model_id":"ESG","version":"2024-Q2","holdings":[("ETHI",35.0),("FAIR",30.0),("VESG",20.0),("VBND",15.0)]},
+    {"model_id":"AUSTRALIAN_EQ","version":"2024-Q2","holdings":[("CBA",25.0),("BHP",20.0),("CSL",15.0),("WES",15.0),("ANZ",12.0),("MQG",8.0),("FMG",5.0)]},
+    {"model_id":"INDEX_PASSIVE","version":"2024-Q2","holdings":[("VAS",40.0),("VGS",40.0),("VAF",20.0)]},
 ]
 
 # ---------------------------------------------------------------------------
@@ -583,18 +620,19 @@ PREDEFINED_MODELS: list = [
 
 def _init_state() -> None:
     defaults: dict = {
-        "portfolios":      [],
-        "model":           None,
-        "saved_models":    {},
-        "drift_reports":   [],
-        "trade_results":   [],
-        "q_answers":       {},
-        "q_result":        None,
-        "q_client_name":   "",
-        "q_step":          0,
-        "weights":         dict(DEFAULT_WEIGHTS),
-        "weight_log":      [],
-        "weights_locked":  False,
+        "page":           "rebalance",
+        "portfolios":     [],
+        "model":          None,
+        "saved_models":   {},
+        "drift_reports":  [],
+        "trade_results":  [],
+        "q_answers":      {},
+        "q_result":       None,
+        "q_client_name":  "",
+        "q_step":         0,
+        "weights":        dict(DEFAULT_WEIGHTS),
+        "weight_log":     [],
+        "weights_locked": False,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -605,76 +643,113 @@ _init_state()
 if not st.session_state.saved_models:
     for _pm in PREDEFINED_MODELS:
         try:
-            _h = [ModelHolding(ticker=t, target_weight=w / 100.0)
-                  for t, w in _pm["holdings"]]
-            _m = ModelPortfolio(
-                model_id=_pm["model_id"],
-                version=_pm["version"],
-                holdings=_h,
-            )
-            _label = f"{_pm['model_id']} ({_pm['version']})"
-            st.session_state.saved_models[_label] = _m
+            _h = [ModelHolding(ticker=t, target_weight=w/100.0) for t,w in _pm["holdings"]]
+            _m = ModelPortfolio(model_id=_pm["model_id"], version=_pm["version"], holdings=_h)
+            st.session_state.saved_models[f"{_pm['model_id']} ({_pm['version']})"] = _m
         except Exception:
             pass
-    # Set GROWTH as the default active model
-    _default_key = "GROWTH (2024-Q2)"
-    if _default_key in st.session_state.saved_models:
-        st.session_state.model = st.session_state.saved_models[_default_key]
-    elif st.session_state.saved_models:
-        st.session_state.model = list(st.session_state.saved_models.values())[0]
+    _dk = "GROWTH (2024-Q2)"
+    st.session_state.model = st.session_state.saved_models.get(
+        _dk, list(st.session_state.saved_models.values())[0] if st.session_state.saved_models else None
+    )
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _utc_now_str() -> str:
+def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
-def _step_header(num: str, title: str, subtitle: str = "", done: bool = False) -> None:
-    icon = f'<span class="step-num-done">✓</span>' if done else f'<span class="step-num">{num}</span>'
+def _settle_date() -> str:
+    d = datetime.now(timezone.utc)
+    added = 0
+    while added < 2:
+        d += timedelta(days=1)
+        if d.weekday() < 5:
+            added += 1
+    return d.strftime("%d %b %Y")
+
+
+def _card_header(step: str, title: str, subtitle: str = "", done: bool = False) -> None:
+    icon = f'<span class="card-step-done">✓</span>' if done else f'<span class="card-step">{step}</span>'
     st.markdown(
-        f'<div class="step-header">'
-        f'{icon}'
-        f'<div>'
-        f'<div class="step-title">{title}</div>'
-        f'{"<div class=step-subtitle>" + subtitle + "</div>" if subtitle else ""}'
-        f'</div>'
-        f'</div>',
+        f'<div class="card-header">{icon}'
+        f'<div><div class="card-title">{title}</div>'
+        f'{"<div class=card-subtitle>" + subtitle + "</div>" if subtitle else ""}'
+        f'</div></div>',
         unsafe_allow_html=True,
     )
 
 
-def _status_bar() -> None:
-    model = st.session_state.model
-    portfolios = st.session_state.portfolios
-    drift_reports = st.session_state.drift_reports
-    trade_results = st.session_state.trade_results
+def _pill(label: str, kind: str) -> str:
+    return f'<span class="pill pill-{kind}">{label}</span>'
 
-    p_val = (f'<span class="status-done">✓ {len(portfolios)} account(s) loaded</span>'
-             if portfolios else '<span class="status-pending">Not loaded</span>')
-    m_val = (f'<span class="status-done">✓ {model.model_id}</span>'
-             if model else '<span class="status-pending">Not selected</span>')
 
-    if drift_reports:
-        needs = sum(1 for dr in drift_reports if dr.requires_rebalance)
-        d_val = (f'<span class="status-warn">⚑ {needs} need rebalancing</span>'
-                 if needs else '<span class="status-done">✓ All in band</span>')
-    else:
-        d_val = '<span class="status-pending">Not run</span>'
+def _status_pill(status: str) -> str:
+    mapping = {
+        "OVERWEIGHT":   ("OVER",   "over"),
+        "UNDERWEIGHT":  ("UNDER",  "under"),
+        "NOT_IN_MODEL": ("DIVEST", "divest"),
+        "IN_BAND":      ("OK",     "ok"),
+    }
+    label, kind = mapping.get(status, (status, "ok"))
+    return _pill(label, kind)
 
-    all_trades = [t for tr in trade_results for t in tr.trades]
-    t_val = (f'<span class="status-done">✓ {len(all_trades)} trades ready</span>'
-             if all_trades else '<span class="status-pending">Not generated</span>')
 
-    st.markdown(
-        f'<div class="status-bar">'
-        f'<div class="status-item"><span class="status-label">Portfolio&nbsp;</span>{p_val}</div>'
-        f'<div class="status-item"><span class="status-label">Model&nbsp;</span>{m_val}</div>'
-        f'<div class="status-item"><span class="status-label">Drift&nbsp;</span>{d_val}</div>'
-        f'<div class="status-item"><span class="status-label">Trades&nbsp;</span>{t_val}</div>'
-        f'</div>',
-        unsafe_allow_html=True,
+def _risk_bar(level: int) -> str:
+    colours = ["#22c55e","#84cc16","#eab308","#f97316","#ef4444"]
+    labels  = ["Conservative","Moderate","Growth","High Growth","Aggressive"]
+    segs = ""
+    for i in range(1, 6):
+        outline = f"outline: 2.5px solid {NAVY}; outline-offset: -2px;" if i == level else ""
+        # Add pattern stripe for accessibility (every other segment)
+        segs += f'<div style="flex:1;background:{colours[i-1]};{outline}"></div>'
+    return (
+        f'<div style="display:flex;height:10px;border-radius:4px;overflow:hidden;margin:0.4rem 0;">{segs}</div>'
+        f'<div style="font-size:0.7rem;color:{MUTED};font-family:IBM Plex Mono,monospace;">'
+        f'Risk profile: <strong style="color:{NAVY}">{labels[level-1] if 1<=level<=5 else ""}</strong></div>'
+    )
+
+
+def _colour_drift_row(row) -> list:
+    s = row.get("Status","")
+    if s == "NOT_IN_MODEL":
+        return ["background:#fff1f2;border-left:4px solid #dc2626"] * len(row)
+    if s == "OVERWEIGHT":
+        return ["background:#fffbeb;border-left:4px solid #d97706"] * len(row)
+    if s == "UNDERWEIGHT":
+        return ["background:#eff6ff;border-left:4px solid #2563eb"] * len(row)
+    return [""] * len(row)
+
+
+def _colour_drift_val(val: float) -> str:
+    if val > 0: return "font-weight:700;color:#92400e"
+    if val < 0: return "font-weight:700;color:#1e3a8a"
+    return ""
+
+
+def _colour_trade_row(row) -> list:
+    a = row.get("Action","")
+    if a == "BUY":  return ["background:#f0fdf4;border-left:4px solid #16a34a"] * len(row)
+    if a == "SELL": return ["background:#fff1f2;border-left:4px solid #dc2626"] * len(row)
+    return [""] * len(row)
+
+
+def _colour_action(val: str) -> str:
+    if val == "BUY":  return "color:#065f46;font-weight:700"
+    if val == "SELL": return "color:#7f1d1d;font-weight:700"
+    return ""
+
+
+def _model_desc_html(model_id: str) -> str:
+    if model_id not in MODEL_DESCRIPTIONS:
+        return ""
+    alloc, desc, _ = MODEL_DESCRIPTIONS[model_id]
+    return (
+        f'<div class="model-desc">'
+        f'<strong>{alloc}</strong> — {desc}'
+        f'</div>'
     )
 
 
@@ -683,197 +758,174 @@ def _compute_score(answers: dict, weights: dict) -> tuple:
     flags: set = set()
     for q in QUESTIONS:
         qid = q["id"]
-        if qid not in answers:
-            continue
+        if qid not in answers: continue
         idx = answers[qid]
         pts = q["options"][idx][1]
         if not q.get("no_score", False):
             section_raw.setdefault(q["section"], []).append(pts)
         if "flags" in q and idx in q["flags"]:
             flags.add(q["flags"][idx])
-
     total_w = weighted_sum = 0.0
     for sec, pts_list in section_raw.items():
-        avg = sum(pts_list) / len(pts_list)
+        avg = sum(pts_list)/len(pts_list)
         w = weights.get(sec, 1.0)
         weighted_sum += avg * w
         total_w += w
-
-    score = round((weighted_sum / total_w) * 6, 2) if total_w else 0.0
-
+    score = round((weighted_sum/total_w)*6, 2) if total_w else 0.0
     conflicts = []
     for q1_id, q1_idxs, q2_id, q2_idxs, msg in CONFLICT_RULES:
         q1_ans = answers.get(q1_id)
-        if q1_ans is None or q1_ans not in q1_idxs:
-            continue
-        if q2_id is None:
-            conflicts.append(msg)
-            continue
+        if q1_ans is None or q1_ans not in q1_idxs: continue
+        if q2_id is None: conflicts.append(msg); continue
         q2_ans = answers.get(q2_id)
-        if q2_ans is not None and q2_ans in q2_idxs:
-            conflicts.append(msg)
-
+        if q2_ans is not None and q2_ans in q2_idxs: conflicts.append(msg)
     return score, flags, conflicts
 
 
 def _score_to_model(score: float, answers: dict) -> str:
     base = "Conservative"
     for lo, hi, name in SCORE_MAP:
-        if lo <= score <= hi:
-            base = name
-            break
-    order = ["Conservative", "Moderate / Balanced", "Growth", "High Growth", "Aggressive"]
+        if lo <= score <= hi: base = name; break
+    order = ["Conservative","Moderate / Balanced","Growth","High Growth","Aggressive"]
     q1 = answers.get("Q1", 4)
-    if q1 == 0:
-        base = "Conservative"
-    elif q1 == 1:
-        base = order[min(order.index(base), 1)]
-    if answers.get("Q4", 4) == 0:
-        base = order[max(order.index(base) - 1, 0)]
+    if q1 == 0: base = "Conservative"
+    elif q1 == 1: base = order[min(order.index(base),1)]
+    if answers.get("Q4",4) == 0: base = order[max(order.index(base)-1,0)]
     return base
 
 
-def _risk_scale_html(level: int) -> str:
-    labels = ["Conservative", "Moderate", "Growth", "High Growth", "Aggressive"]
-    colours = ["#22c55e", "#84cc16", "#eab308", "#f97316", "#ef4444"]
-    segs = ""
-    for i in range(1, 6):
-        border = "3px solid #1e293b" if i == level else "none"
-        segs += (
-            f'<div style="flex:1;background:{colours[i-1]};'
-            f'outline:{border};outline-offset:-2px;"></div>'
-        )
-    label = labels[level - 1] if 1 <= level <= 5 else ""
-    return (
-        f'<div style="display:flex;height:10px;border-radius:4px;overflow:hidden;'
-        f'margin:0.4rem 0;">{segs}</div>'
-        f'<div style="font-size:0.72rem;color:#6b7280;font-family:IBM Plex Mono,monospace;">'
-        f'Risk level: <strong>{label}</strong></div>'
+# ---------------------------------------------------------------------------
+# Sidebar navigation
+# ---------------------------------------------------------------------------
+
+with st.sidebar:
+    st.markdown(
+        '<div class="sidebar-logo">'
+        '<h2>⚖ Rebalancing Engine</h2>'
+        '<p>Portfolio Drift &amp; Trade Generation</p>'
+        '</div>',
+        unsafe_allow_html=True,
     )
 
+    pages = [
+        ("rebalance", "📊", "Rebalance"),
+        ("models",    "📁", "Models"),
+        ("profile",   "📋", "Client Profile"),
+        ("settings",  "⚙",  "Settings"),
+    ]
 
-def _colour_drift(val: float) -> str:
-    """Cell colour for drift column."""
-    if val > 0:
-        return "background-color: #fef9ec; color: #92400e; font-weight: 600"
-    if val < 0:
-        return "background-color: #eff6ff; color: #1e3a8a; font-weight: 600"
-    return ""
+    st.markdown('<div class="nav-section-label">Main</div>', unsafe_allow_html=True)
+    for pg_id, icon, label in pages[:2]:
+        active_cls = "active" if st.session_state.page == pg_id else ""
+        if st.button(
+            f"{icon}  {label}",
+            key=f"nav_{pg_id}",
+            use_container_width=True,
+        ):
+            st.session_state.page = pg_id
+            st.rerun()
 
+    st.markdown('<div class="nav-section-label">Optional</div>', unsafe_allow_html=True)
+    for pg_id, icon, label in pages[2:]:
+        if st.button(
+            f"{icon}  {label}",
+            key=f"nav_{pg_id}",
+            use_container_width=True,
+        ):
+            st.session_state.page = pg_id
+            st.rerun()
 
-def _colour_row(row: "pd.Series") -> list:
-    """Full-row highlight based on status, with left border effect via background."""
-    status = row.get("Status", "")
-    if status == "NOT_IN_MODEL":
-        return ["background-color: #fff1f2; border-left: 4px solid #dc2626"] * len(row)
-    if status == "OVERWEIGHT":
-        return ["background-color: #fffbeb; border-left: 4px solid #d97706"] * len(row)
-    if status == "UNDERWEIGHT":
-        return ["background-color: #eff6ff; border-left: 4px solid #2563eb"] * len(row)
-    return [""] * len(row)
+    # Status panel
+    model = st.session_state.model
+    portfolios = st.session_state.portfolios
+    drift_reports = st.session_state.drift_reports
+    all_trades_s = [t for tr in st.session_state.trade_results for t in tr.trades]
 
+    p_cls = "s-done" if portfolios else "s-idle"
+    p_val = f"{len(portfolios)} loaded" if portfolios else "—"
+    m_cls = "s-done" if model else "s-idle"
+    m_val = model.model_id if model else "—"
 
-def _colour_action(val: str) -> str:
-    if val == "BUY":
-        return "color: #065f46; font-weight: 700; font-family: IBM Plex Mono, monospace"
-    if val == "SELL":
-        return "color: #7f1d1d; font-weight: 700; font-family: IBM Plex Mono, monospace"
-    return ""
+    if drift_reports:
+        needs = sum(1 for dr in drift_reports if dr.requires_rebalance)
+        d_cls = "s-warn" if needs else "s-done"
+        d_val = f"{needs} flagged" if needs else "All in band"
+    else:
+        d_cls, d_val = "s-idle", "—"
 
+    t_cls = "s-done" if all_trades_s else "s-idle"
+    t_val = f"{len(all_trades_s)} trades" if all_trades_s else "—"
 
-def _colour_trade_row(row: "pd.Series") -> list:
-    """Full-row tint for trade table."""
-    action = row.get("Action", "")
-    if action == "BUY":
-        return ["background-color: #f0fdf4; border-left: 4px solid #16a34a"] * len(row)
-    if action == "SELL":
-        return ["background-color: #fff1f2; border-left: 4px solid #dc2626"] * len(row)
-    return [""] * len(row)
+    st.markdown(
+        f'<div class="sidebar-status">'
+        f'<div class="sidebar-status-row"><span class="sidebar-status-label">Portfolio</span><span class="{p_cls}">{p_val}</span></div>'
+        f'<div class="sidebar-status-row"><span class="sidebar-status-label">Model</span><span class="{m_cls}">{m_val}</span></div>'
+        f'<div class="sidebar-status-row"><span class="sidebar-status-label">Drift</span><span class="{d_cls}">{d_val}</span></div>'
+        f'<div class="sidebar-status-row"><span class="sidebar-status-label">Trades</span><span class="{t_cls}">{t_val}</span></div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
-
-# ---------------------------------------------------------------------------
-# App header
-# ---------------------------------------------------------------------------
-
-st.markdown(
-    '<div class="app-header">'
-    '<div>'
-    '<h1>⚖ Rebalancing Engine</h1>'
-    '<div class="tagline">Portfolio Drift &amp; Trade Generation</div>'
-    '</div>'
-    '</div>',
-    unsafe_allow_html=True,
-)
-
-_status_bar()
-
-# ---------------------------------------------------------------------------
-# Tabs
-# ---------------------------------------------------------------------------
-
-tab_rebalance, tab_models, tab_profile, tab_settings = st.tabs([
-    "  Rebalance  ",
-    "  Models  ",
-    "  Client Profile  ",
-    "  Settings  ",
-])
+page = st.session_state.page
 
 # ===========================================================================
-# TAB 1 — REBALANCE  (core workflow)
+# PAGE: REBALANCE
 # ===========================================================================
 
-with tab_rebalance:
+if page == "rebalance":
 
-    # ── Step 1: Load portfolio ───────────────────────────────────────────
+    st.markdown(
+        '<div class="page-header">'
+        '<div><h1>Rebalance</h1>'
+        '<div class="sub">Load a portfolio, select a model, generate trades</div></div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Step 1: Portfolio ────────────────────────────────────────────────
     has_portfolio = bool(st.session_state.portfolios)
-    _step_header("1", "Load Client Portfolio", "Upload a holdings CSV or use the built-in sample data.", done=has_portfolio)
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    _card_header("1", "Load Client Portfolio",
+                 "Upload a holdings CSV or use the built-in sample data.", done=has_portfolio)
 
-    up_col1, up_col2 = st.columns([3, 2])
-    with up_col1:
-        use_sample = st.checkbox("Use sample data")
+    up1, up2 = st.columns([3, 2])
+    with up1:
+        use_sample = st.checkbox("Use built-in sample data")
         if use_sample:
-            if st.button("Load sample portfolio", use_container_width=True):
-                with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=".csv", delete=False, encoding="utf-8"
-                ) as f:
-                    f.write(SAMPLE_CSV)
-                    tmp_path = f.name
+            if st.button("Load sample portfolio", type="primary"):
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".csv",
+                                                  delete=False, encoding="utf-8") as f:
+                    f.write(SAMPLE_CSV); tmp = f.name
                 try:
-                    portfolios = load_portfolios(tmp_path)
-                    st.session_state.portfolios = portfolios
+                    ps = load_portfolios(tmp)
+                    st.session_state.portfolios = ps
                     st.session_state.drift_reports = []
                     st.session_state.trade_results = []
-                    st.success(f"Loaded {len(portfolios)} accounts.")
+                    st.success(f"Loaded {len(ps)} account(s).")
                 except Exception as exc:
                     st.error(str(exc))
                 finally:
-                    os.unlink(tmp_path)
+                    os.unlink(tmp)
         else:
-            uploaded = st.file_uploader(
-                "Upload holdings CSV",
-                type=["csv"],
-                label_visibility="collapsed",
-                help="Required columns: account_id, ticker, quantity, price, cash_balance",
-            )
-            if uploaded is not None:
-                with tempfile.NamedTemporaryFile(
-                    mode="wb", suffix=".csv", delete=False
-                ) as f:
-                    f.write(uploaded.read())
-                    tmp_path = f.name
+            up = st.file_uploader("Upload holdings CSV", type=["csv"],
+                                   label_visibility="collapsed",
+                                   help="Required: account_id, ticker, quantity, price, cash_balance")
+            if up:
+                with tempfile.NamedTemporaryFile(mode="wb", suffix=".csv", delete=False) as f:
+                    f.write(up.read()); tmp = f.name
                 try:
-                    portfolios = load_portfolios(tmp_path)
-                    st.session_state.portfolios = portfolios
+                    ps = load_portfolios(tmp)
+                    st.session_state.portfolios = ps
                     st.session_state.drift_reports = []
                     st.session_state.trade_results = []
-                    st.success(f"Loaded {len(portfolios)} account(s).")
+                    st.success(f"Loaded {len(ps)} account(s).")
                 except ValueError as exc:
-                    st.error(f"Validation error: {exc}")
+                    st.error(str(exc))
                 finally:
-                    os.unlink(tmp_path)
+                    os.unlink(tmp)
 
-    with up_col2:
-        with st.expander("CSV format"):
+    with up2:
+        with st.expander("CSV format reference"):
             st.code(
                 "account_id,ticker,quantity,price,cash_balance\n"
                 "HIN001,VAS,480.0000,104.0000,5000.0000\n"
@@ -882,143 +934,140 @@ with tab_rebalance:
             )
 
     if has_portfolio:
-        with st.expander(
-            f"{len(st.session_state.portfolios)} account(s) loaded — click to preview"
-        ):
+        with st.expander(f"{len(st.session_state.portfolios)} account(s) loaded"):
             for p in st.session_state.portfolios:
                 st.caption(
-                    f"**{p.account_id}**  |  "
-                    f"{len(p.holdings)} holdings  |  "
-                    f"Total value: ${p.total_value():,.4f}  |  "
-                    f"Cash: ${p.cash_balance:,.4f}"
+                    f"**{p.account_id}**  ·  {len(p.holdings)} holdings  ·  "
+                    f"Value: ${p.total_value():,.2f}  ·  Cash: ${p.cash_balance:,.2f}"
                 )
+    else:
+        st.markdown(
+            '<div class="empty-state">'
+            '<div class="icon">📂</div>'
+            '<div class="msg">No portfolio loaded</div>'
+            '<div class="hint">Upload a CSV file or use the sample data above</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
 
-    st.divider()
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Step 2: Select model ─────────────────────────────────────────────
+    # ── Step 2: Model ────────────────────────────────────────────────────
     has_model = bool(st.session_state.model)
-    _step_header("2", "Select Model Portfolio", "Choose the target model to rebalance toward.", done=has_model)
-
     saved_keys = list(st.session_state.saved_models.keys())
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    _card_header("2", "Select Model Portfolio",
+                 "Choose the target model to rebalance toward.", done=has_model)
 
     if not saved_keys:
         st.markdown(
             '<div class="empty-state">'
             '<div class="icon">📁</div>'
-            '<div class="msg">No model portfolios saved</div>'
-            '<div class="hint">Go to the Models tab to create one</div>'
+            '<div class="msg">No models saved</div>'
+            '<div class="hint">Go to Models to create one</div>'
             '</div>',
             unsafe_allow_html=True,
         )
     else:
-        current_label = ""
-        if st.session_state.model:
-            current_label = (
-                f"{st.session_state.model.model_id} "
-                f"({st.session_state.model.version})"
-            )
+        current_label = (
+            f"{st.session_state.model.model_id} ({st.session_state.model.version})"
+            if st.session_state.model else saved_keys[0]
+        )
         default_idx = saved_keys.index(current_label) if current_label in saved_keys else 0
 
-        sel_col1, sel_col2 = st.columns([3, 2])
-        with sel_col1:
-            selected_key = st.selectbox(
-                "Model portfolio",
-                options=saved_keys,
-                index=default_idx,
-                label_visibility="collapsed",
-            )
-        with sel_col2:
+        mc1, mc2 = st.columns([3, 2])
+        with mc1:
+            sel_key = st.selectbox("Model", options=saved_keys, index=default_idx,
+                                    label_visibility="collapsed")
+            sel_model = st.session_state.saved_models[sel_key]
+            mid = sel_model.model_id
+            if mid in MODEL_DESCRIPTIONS:
+                _, level = MODEL_DESCRIPTIONS[mid][1], MODEL_DESCRIPTIONS[mid][2]
+                st.markdown(_model_desc_html(mid), unsafe_allow_html=True)
+                st.markdown(_risk_bar(level), unsafe_allow_html=True)
+
+        with mc2:
+            st.write("")
             if st.button("Use this model", type="primary", use_container_width=True):
-                st.session_state.model = st.session_state.saved_models[selected_key]
+                st.session_state.model = sel_model
                 st.session_state.drift_reports = []
                 st.session_state.trade_results = []
                 st.rerun()
+            if st.session_state.model:
+                m = st.session_state.model
+                st.caption(f"Active: **{m.model_id}** v{m.version} · {len(m.holdings)} holdings")
 
-        if st.session_state.model:
-            m = st.session_state.model
-            with st.expander(
-                f"Model: {m.model_id} v{m.version}  —  {len(m.holdings)} holdings"
-            ):
-                st.dataframe(
-                    pd.DataFrame([
-                        {
-                            "Ticker": h.ticker,
-                            "Target (%)": f"{h.target_weight*100:.4f}%",
-                        }
-                        for h in m.holdings
-                    ]),
-                    use_container_width=True,
-                    hide_index=True,
-                )
+        with st.expander("View holdings"):
+            st.dataframe(
+                pd.DataFrame([
+                    {"Ticker": h.ticker, "Target (%)": f"{h.target_weight*100:.4f}%"}
+                    for h in sel_model.holdings
+                ]),
+                use_container_width=True,
+                hide_index=True,
+            )
 
-    st.divider()
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Step 3: Run settings + rebalance ─────────────────────────────────
+    # ── Step 3: Run ──────────────────────────────────────────────────────
     has_results = bool(st.session_state.drift_reports)
-    _step_header("3", "Run Rebalance", "Configure parameters and run.", done=has_results)
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    _card_header("3", "Run Rebalance", "Configure parameters and execute.", done=has_results)
 
     rs1, rs2, rs3, rs4 = st.columns(4)
     with rs1:
-        drift_threshold = st.slider(
-            "Drift threshold (%)",
-            0.5, 10.0, 3.0, 0.5,
-            help="Flag holdings deviating more than this many percentage points from target",
-        ) / 100.0
+        drift_threshold = st.slider("Drift threshold (%)", 0.5, 10.0, 3.0, 0.5,
+                                     help="Holdings deviating more than this are flagged") / 100.0
     with rs2:
-        min_trade_value = st.number_input(
-            "Min trade value (AUD)",
-            min_value=0.0, value=500.0, step=100.0,
-        )
+        min_trade_value = st.number_input("Min trade value (AUD)",
+                                           min_value=0.0, value=500.0, step=100.0)
     with rs3:
-        fractional_shares = st.checkbox("Fractional shares", value=True)
+        fractional = st.checkbox("Fractional shares", value=True)
     with rs4:
-        decimal_places = int(st.number_input(
-            "Qty decimal places", min_value=1, max_value=6, value=4, step=1,
-        )) if fractional_shares else 0
+        dp = int(st.number_input("Qty decimal places", 1, 6, 4, 1)) if fractional else 0
 
     ready = has_model and has_portfolio
+    st.markdown('<div class="run-btn-wrap">', unsafe_allow_html=True)
 
-    with st.spinner("Calculating drift and generating trades..."):
-        run_clicked = st.button(
-            "Run Rebalance",
-            type="primary",
-            disabled=not ready,
-            use_container_width=False,
-        )
-
-    if run_clicked and ready:
+    if st.button(
+        "▶  Run Rebalance" if not has_results else "↺  Re-run Rebalance",
+        type="primary",
+        disabled=not ready,
+        use_container_width=True,
+    ):
         config = TradeConfig(
             drift_threshold=drift_threshold,
             min_trade_value=min_trade_value,
-            whole_shares=not fractional_shares,
-            managed_fund_dp=decimal_places,
+            whole_shares=not fractional,
+            managed_fund_dp=dp,
         )
-        d_reports, t_results = [], []
-        for portfolio in st.session_state.portfolios:
-            try:
-                dr = calculate_drift(
-                    portfolio, st.session_state.model, threshold=drift_threshold
-                )
-                d_reports.append(dr)
-            except ValueError as exc:
-                st.error(f"{portfolio.account_id}: {exc}")
-                continue
-            try:
-                tr = generate_trades(portfolio, st.session_state.model, config)
-                t_results.append(tr)
-            except ValueError as exc:
-                st.error(f"{portfolio.account_id}: {exc}")
-        st.session_state.drift_reports = d_reports
-        st.session_state.trade_results = t_results
+        with st.spinner("Calculating drift and generating trades..."):
+            d_reports, t_results = [], []
+            for portfolio in st.session_state.portfolios:
+                try:
+                    dr = calculate_drift(portfolio, st.session_state.model, threshold=drift_threshold)
+                    d_reports.append(dr)
+                except ValueError as exc:
+                    st.error(f"{portfolio.account_id}: {exc}"); continue
+                try:
+                    tr = generate_trades(portfolio, st.session_state.model, config)
+                    t_results.append(tr)
+                except ValueError as exc:
+                    st.error(f"{portfolio.account_id}: {exc}")
+            st.session_state.drift_reports = d_reports
+            st.session_state.trade_results = t_results
         st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
     if not ready:
         missing = []
-        if not has_model:
-            missing.append("select a model")
-        if not has_portfolio:
-            missing.append("load a portfolio")
-        st.caption(f"To run: {' and '.join(missing)} above.")
+        if not has_portfolio: missing.append("load a portfolio")
+        if not has_model: missing.append("select a model")
+        st.caption(f"Complete steps above to run: {' and '.join(missing)}.")
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # ── Step 4: Results ──────────────────────────────────────────────────
     drift_reports = st.session_state.drift_reports
@@ -1036,15 +1085,13 @@ with tab_rebalance:
         )
 
     if drift_reports:
-        st.divider()
-        _step_header("4", "Results", "Review drift and trade instructions for each account.", done=bool(all_trades))
-
-        model = st.session_state.model
         gross_buy  = sum(t.estimated_value for t in all_trades if t.action == "BUY")
         gross_sell = sum(t.estimated_value for t in all_trades if t.action == "SELL")
 
-        # Summary metrics — one clear row of 3
-        st.write("")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        _card_header("4", "Results", "Review drift analysis and trade instructions.", done=bool(all_trades))
+
+        # 3 clean summary metrics
         sm1, sm2, sm3 = st.columns(3)
         sm1.metric(
             "Accounts needing rebalance",
@@ -1052,76 +1099,84 @@ with tab_rebalance:
         )
         sm2.metric("Total trades generated", len(all_trades))
         sm3.metric("Net cash flow", f"${gross_sell - gross_buy:+,.2f}")
+
         st.write("")
 
-        # Per-account tabs
-        acct_tabs = st.tabs([f"  {dr.account_id}  " for dr in drift_reports])
+        # Collapsible account cards
+        for dr in drift_reports:
+            tr = next((x for x in trade_results if x.account_id == dr.account_id), None)
+            needs = dr.requires_rebalance
+            shortfall = tr.has_funding_shortfall if tr else False
 
-        for tab_a, dr in zip(acct_tabs, drift_reports):
-            with tab_a:
-                tr = next(
-                    (x for x in trade_results if x.account_id == dr.account_id),
-                    None,
-                )
+            flags_html = ""
+            if needs:
+                flags_html += f'&nbsp;{_pill(f"{dr.flagged_count} flagged", "over")}'
+            else:
+                flags_html += f'&nbsp;{_pill("In band", "ok")}'
+            if shortfall:
+                flags_html += f'&nbsp;{_pill("Shortfall", "divest")}'
 
-                # Account header metrics
+            header_cls = "flagged" if needs else "ok"
+
+            with st.expander(
+                f"**{dr.account_id}**  ·  ${dr.total_portfolio_value:,.2f}  ·  {len(dr.holdings)} holdings",
+                expanded=needs,
+            ):
+                # Account metrics
                 ca, cb, cc, cd = st.columns(4)
                 ca.metric("Portfolio value", f"${dr.total_portfolio_value:,.2f}")
                 cb.metric("Holdings", len(dr.holdings))
-                cc.metric(
-                    "Flagged",
-                    dr.flagged_count,
-                )
+                cc.metric("Flagged", dr.flagged_count)
                 if tr:
-                    shortfall = tr.has_funding_shortfall
                     cd.metric(
                         "⚠ Shortfall" if shortfall else "Closing cash",
                         f"${tr.closing_cash:,.2f}",
                     )
-                    if shortfall:
-                        st.warning(
-                            f"Funding shortfall of ${abs(tr.closing_cash):,.2f}. "
-                            "Buy cost exceeds available cash. Adviser review required."
-                        )
+                if shortfall:
+                    st.warning(
+                        f"Funding shortfall of ${abs(tr.closing_cash):,.2f}. "
+                        "Buy cost exceeds available cash. Adviser review required."
+                    )
 
-                st.divider()
-
-                # Drift table
+                st.write("")
                 st.markdown("**Drift Analysis**")
 
-                drift_rows = [{
-                    "Ticker":       h.ticker,
-                    "Status":       h.status.value,
-                    "Current (%)":  round(h.current_weight * 100, 4),
-                    "Target (%)":   round(h.target_weight * 100, 4),
-                    "Drift (pp)":   round(h.drift * 100, 4),
-                    "Market Value": round(h.market_value, 4),
-                    "Flag":         "Yes" if h.exceeds_threshold else "No",
-                } for h in dr.holdings]
+                # Build drift rows with Status as first data col after Ticker
+                drift_rows = []
+                for h in dr.holdings:
+                    drift_rows.append({
+                        "Ticker":       h.ticker,
+                        "Status":       h.status.value,
+                        "Current (%)":  round(h.current_weight * 100, 4),
+                        "Target (%)":   round(h.target_weight * 100, 4),
+                        "Drift (pp)":   round(h.drift * 100, 4),
+                        "Mkt Value ($)": round(h.market_value, 2),
+                    })
 
+                drift_df = pd.DataFrame(drift_rows)
                 st.dataframe(
-                    pd.DataFrame(drift_rows)
-                    .style
-                    .apply(_colour_row, axis=1)
-                    .map(_colour_drift, subset=["Drift (pp)"])
+                    drift_df.style
+                    .apply(_colour_drift_row, axis=1)
+                    .map(_colour_drift_val, subset=["Drift (pp)"])
                     .format({
                         "Current (%)":  "{:.4f}%",
                         "Target (%)":   "{:.4f}%",
                         "Drift (pp)":   "{:+.4f}pp",
-                        "Market Value": "${:,.2f}",
+                        "Mkt Value ($)": "${:,.2f}",
                     })
                     .hide(axis="index"),
                     use_container_width=True,
-                    height=min(60 + len(drift_rows) * 38, 420),
+                    height=min(60 + len(drift_rows) * 38, 440),
                 )
 
                 if dr.requires_rebalance:
                     st.caption(
                         f"⚑  {dr.flagged_count} holding(s) exceed "
-                        f"the {drift_threshold*100:.1f}pp threshold."
+                        f"the {drift_threshold*100:.1f}pp threshold. "
+                        f"Row colour: amber = overweight, blue = underweight, red = not in model."
                     )
                 else:
-                    st.caption("All holdings are within the drift band. No rebalance required.")
+                    st.caption("✓  All holdings within drift band. No rebalance required.")
 
                 # Trades
                 if tr and tr.trades:
@@ -1133,20 +1188,9 @@ with tab_rebalance:
                     tf2.metric("Sell proceeds", f"${tr.sell_proceeds:,.2f}")
                     tf3.metric("Buy cost",      f"${tr.buy_cost:,.2f}")
                     tf4.metric(
-                        "⚠ Shortfall" if tr.has_funding_shortfall else "Closing cash",
+                        "⚠ Shortfall" if shortfall else "Closing cash",
                         f"${tr.closing_cash:,.2f}",
                     )
-
-                    # T+2 settlement (skip weekends)
-                    def _settle_date() -> str:
-                        from datetime import datetime, timezone, timedelta
-                        d = datetime.now(timezone.utc)
-                        added = 0
-                        while added < 2:
-                            d += timedelta(days=1)
-                            if d.weekday() < 5:
-                                added += 1
-                        return d.strftime("%d %b %Y")
 
                     settle = _settle_date()
                     trows = [{
@@ -1169,105 +1213,101 @@ with tab_rebalance:
                         .hide(axis="index"),
                         use_container_width=True,
                         height=min(60 + len(trows) * 38, 340),
-                        column_config={
-                            "Action":     st.column_config.TextColumn("Action",     width="small"),
-                            "Ticker":     st.column_config.TextColumn("Ticker",     width="small"),
-                            "Quantity":   st.column_config.NumberColumn("Quantity", format="%.4f"),
-                            "Est. Value": st.column_config.NumberColumn("Est. Value ($)", format="$%.2f"),
-                            "Settlement": st.column_config.TextColumn("Settlement (T+2)", width="medium"),
-                        },
                     )
 
                 if tr and tr.suppressed_trades:
-                    with st.expander(
-                        f"Suppressed trades ({len(tr.suppressed_trades)})"
-                    ):
+                    with st.expander(f"Suppressed trades ({len(tr.suppressed_trades)})"):
                         st.dataframe(
                             pd.DataFrame([{
                                 "Action":    td.action,
                                 "Ticker":    td.ticker,
-                                "Raw value": round(td.raw_trade_value, 4),
+                                "Raw value": round(td.raw_trade_value, 2),
                                 "Reason":    td.suppression_reason or "",
                             } for td in tr.suppressed_trades]),
-                            use_container_width=True,
-                            hide_index=True,
+                            use_container_width=True, hide_index=True,
                         )
 
-        # ── Step 5: Download ─────────────────────────────────────────────
-        st.divider()
-        _step_header("5", "Download", "Export trade instructions for execution.", done=False)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        if all_trades:
-            dl1, dl2 = st.columns([2, 5])
-            with dl1:
-                tmp_dl = tempfile.mktemp(suffix=".csv")
-                export_trades_csv(all_trades, tmp_dl, include_metadata=True)
-                with open(tmp_dl, "rb") as f:
-                    csv_bytes = f.read()
-                os.unlink(tmp_dl)
-                st.download_button(
-                    label="Download all trades (CSV)",
-                    data=csv_bytes,
-                    file_name=(
-                        f"trades_{st.session_state.model.model_id}_"
-                        f"{st.session_state.model.version}.csv"
-                    ),
-                    mime="text/csv",
-                    use_container_width=True,
-                    type="primary",
-                )
-            with dl2:
-                st.caption(
-                    f"{len(all_trades)} trade(s) across "
-                    f"{len(set(t.account_id for t in all_trades))} account(s)  |  "
-                    f"Gross buy: ${gross_buy:,.2f}  |  "
-                    f"Gross sell: ${gross_sell:,.2f}  |  "
-                    f"Net: ${gross_sell - gross_buy:+,.2f}"
-                )
-        else:
-            st.caption("No active trades were generated.")
+    # ── Sticky download bar ──────────────────────────────────────────────
+    if all_trades and st.session_state.model:
+        model = st.session_state.model
+        tmp_dl = tempfile.mktemp(suffix=".csv")
+        export_trades_csv(all_trades, tmp_dl, include_metadata=True)
+        with open(tmp_dl, "rb") as f:
+            csv_bytes = f.read()
+        os.unlink(tmp_dl)
+
+        gross_buy  = sum(t.estimated_value for t in all_trades if t.action == "BUY")
+        gross_sell = sum(t.estimated_value for t in all_trades if t.action == "SELL")
+
+        st.markdown('<div class="sticky-download">', unsafe_allow_html=True)
+        dl1, dl2 = st.columns([2, 5])
+        with dl1:
+            st.download_button(
+                label="⬇  Download Trade Instructions (CSV)",
+                data=csv_bytes,
+                file_name=f"trades_{model.model_id}_{model.version}.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+        with dl2:
+            st.markdown(
+                f'<div class="dl-summary">'
+                f'<strong>{len(all_trades)}</strong> trades  ·  '
+                f'<strong>{len(set(t.account_id for t in all_trades))}</strong> accounts  ·  '
+                f'Gross buy <strong>${gross_buy:,.2f}</strong>  ·  '
+                f'Gross sell <strong>${gross_sell:,.2f}</strong>  ·  '
+                f'Net <strong>${gross_sell - gross_buy:+,.2f}</strong>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ===========================================================================
-# TAB 2 — MODELS
+# PAGE: MODELS
 # ===========================================================================
 
-with tab_models:
-    st.markdown("### Model Portfolios")
-    st.caption("Create and manage model portfolios. The active model is used in the Rebalance tab.")
+elif page == "models":
+
+    st.markdown(
+        '<div class="page-header">'
+        '<div><h1>Model Portfolios</h1>'
+        '<div class="sub">Create and manage target model portfolios</div></div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
     saved_models = st.session_state.saved_models
     saved_keys = list(saved_models.keys())
 
     if saved_keys:
-        st.markdown("#### Saved models")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown("#### Saved Models")
 
-        current_label = ""
-        if st.session_state.model:
-            current_label = (
-                f"{st.session_state.model.model_id} "
-                f"({st.session_state.model.version})"
-            )
+        current_label = (
+            f"{st.session_state.model.model_id} ({st.session_state.model.version})"
+            if st.session_state.model else saved_keys[0]
+        )
         default_idx = saved_keys.index(current_label) if current_label in saved_keys else 0
 
-        sel_model_key = st.selectbox(
-            "Select model to view",
-            options=saved_keys,
-            index=default_idx,
-            key="models_tab_select",
-        )
-        sel_model = saved_models[sel_model_key]
+        sel_key = st.selectbox("Select model", options=saved_keys, index=default_idx)
+        sel_model = saved_models[sel_key]
+        mid = sel_model.model_id
+
+        if mid in MODEL_DESCRIPTIONS:
+            _, level = MODEL_DESCRIPTIONS[mid][1], MODEL_DESCRIPTIONS[mid][2]
+            st.markdown(_model_desc_html(mid), unsafe_allow_html=True)
+            st.markdown(_risk_bar(level), unsafe_allow_html=True)
+            st.write("")
 
         st.dataframe(
             pd.DataFrame([
-                {
-                    "Ticker": h.ticker,
-                    "Target Weight (%)": round(h.target_weight * 100, 4),
-                }
+                {"Ticker": h.ticker, "Target Weight (%)": round(h.target_weight*100, 4)}
                 for h in sel_model.holdings
             ]),
-            use_container_width=True,
-            hide_index=True,
+            use_container_width=True, hide_index=True,
         )
 
         mc1, mc2 = st.columns([3, 1])
@@ -1276,27 +1316,20 @@ with tab_models:
                 st.session_state.model = sel_model
                 st.session_state.drift_reports = []
                 st.session_state.trade_results = []
-                st.success(f"Active model set to: {sel_model_key}")
+                st.success(f"Active model set to: {sel_key}")
         with mc2:
-            if st.button("Delete", use_container_width=True):
-                if len(saved_keys) == 1:
-                    st.error("Cannot delete the only saved model.")
-                else:
-                    confirm_key = f"confirm_delete_{sel_model_key}"
+            if len(saved_keys) > 1:
+                confirm_key = f"confirm_del_{sel_key}"
+                if st.button("Delete", use_container_width=True):
                     if confirm_key not in st.session_state:
                         st.session_state[confirm_key] = True
-                        st.warning(
-                            f"Click Delete again to confirm deletion of '{sel_model_key}'."
-                        )
+                        st.warning("Click Delete again to confirm.")
                     else:
-                        del st.session_state.saved_models[sel_model_key]
+                        del st.session_state.saved_models[sel_key]
                         del st.session_state[confirm_key]
                         if st.session_state.model:
-                            lbl = (
-                                f"{st.session_state.model.model_id} "
-                                f"({st.session_state.model.version})"
-                            )
-                            if lbl == sel_model_key:
+                            lbl = f"{st.session_state.model.model_id} ({st.session_state.model.version})"
+                            if lbl == sel_key:
                                 st.session_state.model = None
                                 st.session_state.drift_reports = []
                                 st.session_state.trade_results = []
@@ -1305,46 +1338,41 @@ with tab_models:
         if st.session_state.model:
             st.caption(
                 f"Active: **{st.session_state.model.model_id}** "
-                f"v{st.session_state.model.version}  |  "
+                f"v{st.session_state.model.version}  ·  "
                 f"{len(st.session_state.model.holdings)} holdings"
             )
-    else:
-        st.info("No saved models. Create one below.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    st.divider()
-    st.markdown("#### Create new model")
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("#### Create New Model")
 
-    mc_a, mc_b = st.columns(2)
-    with mc_a:
+    nm1, nm2 = st.columns(2)
+    with nm1:
         new_id = st.text_input("Model ID", placeholder="e.g. CONSERVATIVE_30")
-    with mc_b:
+    with nm2:
         new_ver = st.text_input("Version", placeholder="e.g. 2024-Q3")
 
-    st.caption("Enter target weights — must sum to exactly 100%")
+    st.caption("Enter target weights — must sum to 100%")
 
-    m_weight_df = st.data_editor(
+    m_wdf = st.data_editor(
         pd.DataFrame(SAMPLE_MODEL_WEIGHTS, columns=["Ticker", "Weight"]),
         num_rows="dynamic",
         column_config={
             "Ticker": st.column_config.TextColumn("Ticker", width="small"),
             "Weight": st.column_config.NumberColumn(
-                "Weight (%)", min_value=0.0001, max_value=100.0,
-                step=0.01, format="%.4f",
-            ),
+                "Weight (%)", min_value=0.0001, max_value=100.0, step=0.01, format="%.4f"),
         },
-        hide_index=True,
-        use_container_width=True,
-        key="weight_editor_models",
+        hide_index=True, use_container_width=True, key="wdf_models",
     )
 
-    wsum = m_weight_df["Weight"].sum() if not m_weight_df.empty else 0.0
+    wsum = m_wdf["Weight"].sum() if not m_wdf.empty else 0.0
     wdelta = wsum - 100.0
     if abs(wdelta) < 0.05:
-        st.success(f"Weights sum: {wsum:.4f}%  ✓")
+        st.success(f"Weights sum: {wsum:.4f}% ✓")
     else:
         st.warning(f"Weights sum: {wsum:.4f}%  (need 100%,  {wdelta:+.4f}%)")
 
-    if st.button("Save model", type="primary"):
+    if st.button("Save Model", type="primary"):
         if not new_id.strip():
             st.error("Model ID is required.")
         elif not new_ver.strip():
@@ -1352,19 +1380,11 @@ with tab_models:
         else:
             try:
                 holdings = [
-                    ModelHolding(
-                        ticker=str(r["Ticker"]).strip().upper(),
-                        target_weight=float(r["Weight"]) / 100.0,
-                    )
-                    for _, r in m_weight_df.iterrows()
-                    if str(r["Ticker"]).strip()
-                    and str(r["Ticker"]).strip().lower() != "nan"
+                    ModelHolding(ticker=str(r["Ticker"]).strip().upper(), target_weight=float(r["Weight"])/100.0)
+                    for _, r in m_wdf.iterrows()
+                    if str(r["Ticker"]).strip() and str(r["Ticker"]).strip().lower() != "nan"
                 ]
-                new_model = ModelPortfolio(
-                    model_id=new_id.strip(),
-                    version=new_ver.strip(),
-                    holdings=holdings,
-                )
+                new_model = ModelPortfolio(model_id=new_id.strip(), version=new_ver.strip(), holdings=holdings)
                 label = f"{new_model.model_id} ({new_model.version})"
                 st.session_state.saved_models[label] = new_model
                 st.session_state.model = new_model
@@ -1375,24 +1395,28 @@ with tab_models:
             except ValueError as exc:
                 st.error(str(exc))
 
+    st.markdown('</div>', unsafe_allow_html=True)
+
 
 # ===========================================================================
-# TAB 3 — CLIENT PROFILE  (optional)
+# PAGE: CLIENT PROFILE
 # ===========================================================================
 
-with tab_profile:
-    st.markdown("### Client Risk Profile")
-    st.caption(
-        "Optional — use this questionnaire to determine an appropriate model "
-        "portfolio for a client. Results can be exported for the client file."
+elif page == "profile":
+
+    st.markdown(
+        '<div class="page-header">'
+        '<div><h1>Client Profile</h1>'
+        '<div class="sub">Optional — risk questionnaire to determine suitable model portfolio</div></div>'
+        '</div>',
+        unsafe_allow_html=True,
     )
 
     scored_qs = [q for q in QUESTIONS if not q.get("no_score", False)]
-    total_qs = len(QUESTIONS)
-
-    # One-question-at-a-time flow
     step = st.session_state.q_step
     answers = dict(st.session_state.q_answers)
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
 
     col_cn, col_dt = st.columns([3, 2])
     with col_cn:
@@ -1403,231 +1427,146 @@ with tab_profile:
         )
         st.session_state.q_client_name = client_name
     with col_dt:
-        st.metric("Date", _utc_now_str().split(" ")[0])
+        st.metric("Assessment date", _utc_now().split(" ")[0])
 
-    st.divider()
+    st.progress(min(step, len(QUESTIONS)) / len(QUESTIONS),
+                text=f"Question {min(step+1, len(QUESTIONS))} of {len(QUESTIONS)}")
 
-    # Progress bar
-    answered = sum(1 for q in QUESTIONS if q["id"] in answers)
-    st.progress(answered / total_qs, text=f"Question {min(step+1, total_qs)} of {total_qs}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Current question
-    if step < total_qs:
+    if step < len(QUESTIONS):
         q = QUESTIONS[step]
-        st.markdown(
-            f"**Section {q['section']} — {q['label']}**",
-        )
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown(f"**Section {q['section']} — {q['label']}**")
         st.markdown(f"### {q['text']}")
 
         options = [opt[0] for opt in q["options"]]
         current_idx = answers.get(q["id"], None)
-
-        selected = st.radio(
-            "Select an answer",
-            options=options,
-            index=current_idx,
-            key=f"q_radio_{step}",
-            label_visibility="collapsed",
-        )
+        selected = st.radio("Select an answer", options=options,
+                             index=current_idx, key=f"qr_{step}",
+                             label_visibility="collapsed")
 
         st.write("")
-        nav1, nav2, nav3 = st.columns([1, 1, 5])
-
-        with nav1:
-            if step > 0:
-                if st.button("Back", use_container_width=True):
-                    st.session_state.q_step = step - 1
-                    st.rerun()
-
-        with nav2:
-            label = "Next" if step < total_qs - 1 else "See results"
-            if st.button(label, type="primary", use_container_width=True,
-                         disabled=selected is None):
+        n1, n2, n3 = st.columns([1, 1, 5])
+        with n1:
+            if step > 0 and st.button("← Back", use_container_width=True):
+                st.session_state.q_step = step - 1
+                st.rerun()
+        with n2:
+            label = "Next →" if step < len(QUESTIONS)-1 else "See Results →"
+            if st.button(label, type="primary", use_container_width=True, disabled=selected is None):
                 if selected is not None:
                     answers[q["id"]] = options.index(selected)
                     st.session_state.q_answers = answers
                 st.session_state.q_step = step + 1
                 st.rerun()
 
-    else:
-        # Results page
-        all_scored_answered = all(q["id"] in answers for q in scored_qs)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        if not all_scored_answered:
-            st.warning("Some scored questions were not answered. Please go back and complete them.")
-            if st.button("Back to questions"):
-                st.session_state.q_step = 0
-                st.rerun()
+    else:
+        all_answered = all(q["id"] in answers for q in scored_qs)
+        if not all_answered:
+            st.warning("Some scored questions were not answered.")
+            if st.button("← Back to questions"):
+                st.session_state.q_step = 0; st.rerun()
         else:
             score, flags, conflicts = _compute_score(answers, st.session_state.weights)
             base_model = _score_to_model(score, answers)
-
             display_model = base_model
-            if "income" in flags:
-                display_model += " — Income / Yield"
-            if "esg" in flags:
-                display_model += " (ESG)"
+            if "income" in flags: display_model += " — Income / Yield"
+            if "esg"    in flags: display_model += " (ESG)"
 
-            st.markdown("#### Assessment complete")
+            st.markdown('<div class="card">', unsafe_allow_html=True)
+            st.markdown("#### Assessment Result")
 
             level = RISK_LEVEL.get(base_model, 3)
             r1, r2 = st.columns([2, 3])
             with r1:
                 st.metric("Recommended model", base_model)
-                st.markdown(_risk_scale_html(level), unsafe_allow_html=True)
+                st.markdown(_risk_bar(level), unsafe_allow_html=True)
                 if flags:
                     st.caption(f"Flags: {', '.join(f.upper() for f in flags)}")
             with r2:
                 with st.expander("Score breakdown"):
                     rows = []
-                    for sec, label in SECTION_LABELS.items():
-                        sec_qs = [q for q in QUESTIONS
-                                  if q["section"] == sec and not q.get("no_score", False)]
-                        pts = [q["options"][answers[q["id"]]][1]
-                               for q in sec_qs if q["id"] in answers]
+                    for sec, lbl in SECTION_LABELS.items():
+                        sec_qs = [q for q in QUESTIONS if q["section"]==sec and not q.get("no_score",False)]
+                        pts = [q["options"][answers[q["id"]]][1] for q in sec_qs if q["id"] in answers]
                         if pts:
-                            avg = sum(pts) / len(pts)
-                            w = st.session_state.weights.get(sec, 1.0)
-                            rows.append({
-                                "Section": f"{sec} — {label}",
-                                "Score (1–5)": round(avg, 2),
-                                "Weight": w,
-                            })
-                    if rows:
-                        st.dataframe(
-                            pd.DataFrame(rows),
-                            use_container_width=True,
-                            hide_index=True,
-                        )
+                            avg = sum(pts)/len(pts)
+                            w = st.session_state.weights.get(sec,1.0)
+                            rows.append({"Section": f"{sec} — {lbl}", "Score (1–5)": round(avg,2), "Weight": w})
+                    if rows: st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
             if conflicts:
                 st.markdown(
-                    '<div class="conflict-box">'
-                    '<strong>Conflicts detected — adviser review required</strong><br>'
+                    '<div class="conflict-box"><strong>Conflicts detected — adviser review required</strong><br>'
                     + "<br>".join(f"• {c}" for c in conflicts)
-                    + "</div>",
-                    unsafe_allow_html=True,
+                    + '</div>', unsafe_allow_html=True,
                 )
 
-            st.divider()
-            st.markdown("#### Adviser override")
-            st.caption(
-                "Override the recommended model if required. "
-                "A reason must be provided and will be recorded."
-            )
+            st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div class="card">', unsafe_allow_html=True)
+            st.markdown("#### Adviser Override")
+            st.caption("Override the recommended model if required. A reason must be documented.")
 
-            override_options = [
-                "— Use recommended model —",
-                "Conservative", "Moderate / Balanced", "Growth",
-                "High Growth", "Aggressive", "Income / Yield",
-                "ESG", "Australian Equities", "Index / Passive",
+            ov_opts = [
+                "— Use recommended model —","Conservative","Moderate / Balanced",
+                "Growth","High Growth","Aggressive","Income / Yield",
+                "ESG","Australian Equities","Index / Passive",
             ]
-            override_sel = st.selectbox(
-                "Override selection", options=override_options, index=0,
-            )
-            override_reason = ""
-            if override_sel != "— Use recommended model —":
-                override_reason = st.text_area(
-                    "Reason for override (required)",
-                    placeholder="Document why the recommended model is not appropriate...",
-                )
-                if not override_reason.strip():
-                    st.warning("A reason must be provided before saving.")
+            ov_sel = st.selectbox("Override selection", options=ov_opts, index=0)
+            ov_reason = ""
+            if ov_sel != "— Use recommended model —":
+                ov_reason = st.text_area("Reason for override (required)",
+                                          placeholder="Document why the recommended model is not appropriate...")
+                if not ov_reason.strip(): st.warning("A reason must be provided.")
 
-            final_model = (
-                override_sel if override_sel != "— Use recommended model —"
-                else display_model
-            )
-            is_overridden = override_sel != "— Use recommended model —"
+            final_model = ov_sel if ov_sel != "— Use recommended model —" else display_model
+            is_overridden = ov_sel != "— Use recommended model —"
+            st.info(f"**Final model: {final_model}**"
+                    + ("  *(adviser override)*" if is_overridden else "  *(system recommended)*"))
 
-            st.info(
-                f"**Final model: {final_model}**"
-                + ("  *(adviser override)*" if is_overridden else "  *(system recommended)*")
-            )
+            can_save = not is_overridden or bool(ov_reason.strip())
+            sc1, sc2, sc3 = st.columns(3)
 
-            can_save = not is_overridden or bool(override_reason.strip())
-
-            save_col, export_col, restart_col = st.columns(3)
-
-            with save_col:
-                if st.button(
-                    "Save profile",
-                    type="primary",
-                    use_container_width=True,
-                    disabled=not can_save,
-                ):
+            with sc1:
+                if st.button("Save Profile", type="primary", use_container_width=True, disabled=not can_save):
                     st.session_state.q_result = {
-                        "client_name":     client_name,
-                        "timestamp":       _utc_now_str(),
-                        "version":         QUESTIONNAIRE_VERSION,
-                        "answers":         dict(answers),
-                        "score":           score,
-                        "flags":           list(flags),
-                        "conflicts":       conflicts,
-                        "base_model":      base_model,
-                        "display_model":   display_model,
-                        "final_model":     final_model,
-                        "overridden":      is_overridden,
-                        "override_reason": override_reason.strip(),
-                        "weights_used":    dict(st.session_state.weights),
+                        "client_name": client_name, "timestamp": _utc_now(),
+                        "version": QUESTIONNAIRE_VERSION, "answers": dict(answers),
+                        "score": score, "flags": list(flags), "conflicts": conflicts,
+                        "base_model": base_model, "display_model": display_model,
+                        "final_model": final_model, "overridden": is_overridden,
+                        "override_reason": ov_reason.strip(),
+                        "weights_used": dict(st.session_state.weights),
                     }
                     st.success("Profile saved.")
 
-            with export_col:
+            with sc2:
                 if st.session_state.q_result:
                     res = st.session_state.q_result
-                    lines = [
-                        ["Risk Profile Assessment"],
-                        ["Client", res["client_name"]],
-                        ["Date", res["timestamp"]],
-                        ["Questionnaire version", res["version"]],
-                        [],
-                        ["Question", "Answer", "Points"],
-                    ]
+                    lines = [["Risk Profile Assessment"],["Client",res["client_name"]],
+                             ["Date",res["timestamp"]],["Version",res["version"]],[],
+                             ["Question","Answer","Points"]]
                     for q in QUESTIONS:
-                        qid = q["id"]
-                        if qid in res["answers"]:
-                            idx = res["answers"][qid]
-                            opt_text, pts = q["options"][idx]
-                            lines.append([
-                                q["text"], opt_text,
-                                "" if q.get("no_score") else pts,
-                            ])
-                    lines += [
-                        [],
-                        ["Weighted score", res["score"]],
-                        ["Recommended model", res["display_model"]],
-                        ["Final model", res["final_model"]],
-                        ["Override", "Yes" if res["overridden"] else "No"],
-                    ]
-                    if res["overridden"]:
-                        lines.append(["Override reason", res["override_reason"]])
-                    if res["conflicts"]:
-                        lines.append(["Conflicts", "; ".join(res["conflicts"])])
-                    buf = io.StringIO()
-                    csv.writer(buf).writerows(lines)
-                    fname = (
-                        f"risk_profile_"
-                        f"{client_name.replace(' ', '_') or 'client'}_"
-                        f"{res['timestamp'][:10]}.csv"
-                    )
-                    st.download_button(
-                        label="Download summary (CSV)",
-                        data=buf.getvalue().encode("utf-8-sig"),
-                        file_name=fname,
-                        mime="text/csv",
-                        use_container_width=True,
-                    )
+                        if q["id"] in res["answers"]:
+                            idx = res["answers"][q["id"]]
+                            ot, pts = q["options"][idx]
+                            lines.append([q["text"], ot, "" if q.get("no_score") else pts])
+                    lines += [[],["Score",res["score"]],["Recommended",res["display_model"]],
+                              ["Final",res["final_model"]],["Override","Yes" if res["overridden"] else "No"]]
+                    if res["overridden"]: lines.append(["Override reason",res["override_reason"]])
+                    if res["conflicts"]:  lines.append(["Conflicts","; ".join(res["conflicts"])])
+                    buf = io.StringIO(); csv.writer(buf).writerows(lines)
+                    fname = f"risk_profile_{client_name.replace(' ','_') or 'client'}_{res['timestamp'][:10]}.csv"
+                    st.download_button("Download Summary (CSV)", data=buf.getvalue().encode("utf-8-sig"),
+                                       file_name=fname, mime="text/csv", use_container_width=True)
                 else:
-                    st.button(
-                        "Download summary (CSV)",
-                        disabled=True,
-                        use_container_width=True,
-                        help="Save profile first",
-                    )
+                    st.button("Download Summary (CSV)", disabled=True, use_container_width=True)
 
-            with restart_col:
-                if st.button("Start new assessment", use_container_width=True):
+            with sc3:
+                if st.button("Start New Assessment", use_container_width=True):
                     st.session_state.q_answers = {}
                     st.session_state.q_step = 0
                     st.session_state.q_result = None
@@ -1637,32 +1576,36 @@ with tab_profile:
             if st.session_state.q_result:
                 st.divider()
                 st.caption(
-                    f"To apply this profile, go to **Models** and activate a model "
-                    f"matching **{final_model}**, then run the rebalance."
+                    f"Go to **Models** to activate a model matching **{final_model}**, "
+                    f"then run the rebalance."
                 )
 
+            st.markdown('</div>', unsafe_allow_html=True)
+
 
 # ===========================================================================
-# TAB 4 — SETTINGS
+# PAGE: SETTINGS
 # ===========================================================================
 
-with tab_settings:
-    st.markdown("### Settings")
-    st.caption(
-        "Configure questionnaire section weightings. "
-        "All changes are timestamped and logged for compliance purposes."
+elif page == "settings":
+
+    st.markdown(
+        '<div class="page-header">'
+        '<div><h1>Settings</h1>'
+        '<div class="sub">Questionnaire weighting and principal controls</div></div>'
+        '</div>',
+        unsafe_allow_html=True,
     )
 
     locked = st.session_state.weights_locked
-
     if locked:
-        st.error("Weightings are locked by the practice principal. Unlock below to make changes.")
+        st.error("Weightings are locked by the practice principal.")
 
-    st.divider()
-    st.markdown("#### Questionnaire section weights")
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("#### Section Weights")
     st.caption(
-        f"Adjust how much each section contributes to the final risk score.  "
-        f"Range: {WEIGHT_MIN}x – {WEIGHT_MAX}x.  Default: 1.0x (equal weight)."
+        f"Adjust how much each section contributes to the final risk score. "
+        f"Range: {WEIGHT_MIN}x – {WEIGHT_MAX}x. Default: 1.0x (equal weight)."
     )
 
     new_weights = {}
@@ -1671,92 +1614,74 @@ with tab_settings:
         col = wc1 if i % 2 == 0 else wc2
         with col:
             new_weights[sec] = st.slider(
-                f"{sec}  —  {label}",
-                min_value=WEIGHT_MIN,
-                max_value=WEIGHT_MAX,
-                value=float(st.session_state.weights.get(sec, 1.0)),
-                step=0.1,
-                disabled=locked,
-                key=f"weight_slider_{sec}",
+                f"{sec} — {label}", WEIGHT_MIN, WEIGHT_MAX,
+                float(st.session_state.weights.get(sec, 1.0)), 0.1,
+                disabled=locked, key=f"ws_{sec}",
             )
 
     total_w = sum(new_weights.values())
     st.markdown("**Effective contribution to final score**")
     st.dataframe(
         pd.DataFrame([{
-            "Section": f"{s}  —  {SECTION_LABELS[s]}",
+            "Section": f"{s} — {SECTION_LABELS[s]}",
             "Weight": new_weights[s],
             "Contribution": f"{new_weights[s]/total_w*100:.1f}%",
         } for s in SECTION_LABELS]),
-        use_container_width=False,
-        hide_index=True,
+        use_container_width=False, hide_index=True,
     )
 
-    st.write("")
     note_col, btn_col = st.columns([3, 2])
     with note_col:
         change_note = st.text_input(
             "Reason for change (required)",
-            placeholder="e.g. Practice policy update — increase time horizon weighting",
+            placeholder="e.g. Practice policy update",
             disabled=locked,
         )
     with btn_col:
-        st.write("")
-        st.write("")
+        st.write(""); st.write("")
         b1, b2 = st.columns(2)
         with b1:
-            if st.button(
-                "Save",
-                type="primary",
-                disabled=locked or not change_note.strip(),
-                use_container_width=True,
-            ):
+            if st.button("Save", type="primary",
+                         disabled=locked or not change_note.strip(),
+                         use_container_width=True):
                 st.session_state.weight_log.append({
-                    "timestamp": _utc_now_str(),
-                    "weights":   dict(new_weights),
-                    "note":      change_note.strip(),
+                    "timestamp": _utc_now(), "weights": dict(new_weights), "note": change_note.strip()
                 })
                 st.session_state.weights = dict(new_weights)
-                st.success("Weightings saved and logged.")
+                st.success("Saved.")
         with b2:
             if st.button("Reset", disabled=locked, use_container_width=True):
                 st.session_state.weights = dict(DEFAULT_WEIGHTS)
                 st.session_state.weight_log.append({
-                    "timestamp": _utc_now_str(),
-                    "weights":   dict(DEFAULT_WEIGHTS),
-                    "note":      "Restored to default equal weighting",
+                    "timestamp": _utc_now(), "weights": dict(DEFAULT_WEIGHTS),
+                    "note": "Restored to default equal weighting"
                 })
-                st.success("Reset to defaults.")
-                st.rerun()
+                st.success("Reset."); st.rerun()
 
-    st.divider()
-    st.markdown("#### Principal controls")
-    st.caption(
-        "Lock weightings to prevent individual advisers from making changes. "
-        "Only the practice principal should use this control."
-    )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("#### Principal Controls")
+    st.caption("Lock weightings to prevent advisers from making changes.")
 
     if locked:
-        if st.button("Unlock weightings"):
-            st.session_state.weights_locked = False
-            st.rerun()
+        if st.button("🔓 Unlock Weightings"):
+            st.session_state.weights_locked = False; st.rerun()
     else:
-        if st.button("Lock weightings"):
-            st.session_state.weights_locked = True
-            st.rerun()
+        if st.button("🔒 Lock Weightings"):
+            st.session_state.weights_locked = True; st.rerun()
 
-    st.divider()
-    st.markdown("#### Change log")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("#### Change Log")
     if st.session_state.weight_log:
         log_rows = []
         for entry in reversed(st.session_state.weight_log):
             row = {"Timestamp": entry["timestamp"], "Note": entry["note"]}
             row.update({s: entry["weights"].get(s, 1.0) for s in SECTION_LABELS})
             log_rows.append(row)
-        st.dataframe(
-            pd.DataFrame(log_rows),
-            use_container_width=True,
-            hide_index=True,
-        )
+        st.dataframe(pd.DataFrame(log_rows), use_container_width=True, hide_index=True)
     else:
         st.caption("No changes recorded yet.")
+    st.markdown('</div>', unsafe_allow_html=True)
