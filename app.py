@@ -127,33 +127,38 @@ section[data-testid="stSidebar"] > div {{ padding: 0 !important; }}
 section[data-testid="stSidebar"] div[data-testid="stButton"] {{
     margin: 0 !important;
     padding: 0 !important;
+    width: 100% !important;
 }}
 section[data-testid="stSidebar"] div[data-testid="stButton"] button {{
-    background: transparent !important;
-    border: none !important;
-    border-left: 2px solid transparent !important;
-    border-radius: 0 !important;
-    color: {MUTED} !important;
+    all: unset !important;
+    display: block !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 0.55rem 1.25rem !important;
     font-family: 'IBM Plex Sans', sans-serif !important;
     font-size: 0.82rem !important;
     font-weight: 500 !important;
+    color: {MUTED} !important;
     text-align: left !important;
-    padding: 0.5rem 1.25rem !important;
-    width: 100% !important;
-    box-shadow: none !important;
-    display: block !important;
-    min-height: 0 !important;
-    height: auto !important;
-    line-height: 1.6 !important;
+    cursor: pointer !important;
+    border-left: 2px solid transparent !important;
+    background: transparent !important;
+    line-height: 1.5 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
 }}
 section[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {{
     background: {OFF_W} !important;
     color: {NAVY} !important;
     border-left-color: {BORDER} !important;
 }}
-section[data-testid="stSidebar"] div[data-testid="stButton"] button:focus {{
-    box-shadow: none !important;
-    border-left-color: {BLUE} !important;
+section[data-testid="stSidebar"] div[data-testid="stButton"] button p {{
+    margin: 0 !important;
+    text-align: left !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    color: inherit !important;
 }}
 
 /* ── Sidebar status ── */
