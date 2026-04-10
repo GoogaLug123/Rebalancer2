@@ -72,20 +72,20 @@ html, body, [class*="css"] {{
 }}
 
 /* ── Hide sidebar entirely ── */
-section[data-testid="stSidebar"] { display: none !important; }
+section[data-testid="stSidebar"] {{ display: none !important; }}
 
 /* ── Tab styling ── */
-button[data-baseweb="tab"] {
+button[data-baseweb="tab"] {{
     font-family: 'IBM Plex Sans', sans-serif !important;
     font-size: 0.82rem !important;
     font-weight: 500 !important;
     color: #6b7280 !important;
     padding: 0.6rem 1rem !important;
-}
-button[data-baseweb="tab"][aria-selected="true"] {
+}}
+button[data-baseweb="tab"][aria-selected="true"] {{
     color: #0f1f3d !important;
     font-weight: 600 !important;
-}
+}}
 
 /* ── Page heading ── */
 .page-heading {{
