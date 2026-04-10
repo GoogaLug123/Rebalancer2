@@ -1139,6 +1139,7 @@ with tab_rebalance:
 
                     # T+2 settlement (skip weekends)
                     def _settle_date() -> str:
+                        from datetime import datetime, timezone, timedelta
                         d = datetime.now(timezone.utc)
                         added = 0
                         while added < 2:
