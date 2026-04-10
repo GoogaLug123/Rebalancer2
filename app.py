@@ -567,8 +567,8 @@ def _status_bar() -> None:
 
     st.markdown(
         f'<div class="status-bar">'
-        f'<div class="status-item"><b>Model:</b>&nbsp;{m_str}</div>'
         f'<div class="status-item"><b>Portfolio:</b>&nbsp;{p_str}</div>'
+        f'<div class="status-item"><b>Model:</b>&nbsp;{m_str}</div>'
         f'<div class="status-item"><b>Drift:</b>&nbsp;{d_str}</div>'
         f'<div class="status-item"><b>Trades:</b>&nbsp;{t_str}</div>'
         f'</div>',
@@ -697,60 +697,9 @@ tab_rebalance, tab_models, tab_profile, tab_settings = st.tabs([
 
 with tab_rebalance:
 
-    # ── Step 1: Select model ─────────────────────────────────────────────
-    has_model = bool(st.session_state.model)
-    _step_header("1", "Select Model", "Choose the target model portfolio for this rebalance.", done=has_model)
-
-    saved_keys = list(st.session_state.saved_models.keys())
-
-    if not saved_keys:
-        st.warning("No models saved yet. Go to the **Models** tab to create one.")
-    else:
-        current_label = ""
-        if st.session_state.model:
-            current_label = (
-                f"{st.session_state.model.model_id} "
-                f"({st.session_state.model.version})"
-            )
-        default_idx = saved_keys.index(current_label) if current_label in saved_keys else 0
-
-        sel_col1, sel_col2 = st.columns([3, 2])
-        with sel_col1:
-            selected_key = st.selectbox(
-                "Model portfolio",
-                options=saved_keys,
-                index=default_idx,
-                label_visibility="collapsed",
-            )
-        with sel_col2:
-            if st.button("Use this model", type="primary", use_container_width=True):
-                st.session_state.model = st.session_state.saved_models[selected_key]
-                st.session_state.drift_reports = []
-                st.session_state.trade_results = []
-                st.rerun()
-
-        if st.session_state.model:
-            m = st.session_state.model
-            with st.expander(
-                f"Model: {m.model_id} v{m.version}  —  {len(m.holdings)} holdings"
-            ):
-                st.dataframe(
-                    pd.DataFrame([
-                        {
-                            "Ticker": h.ticker,
-                            "Target (%)": f"{h.target_weight*100:.4f}%",
-                        }
-                        for h in m.holdings
-                    ]),
-                    use_container_width=True,
-                    hide_index=True,
-                )
-
-    st.divider()
-
-    # ── Step 2: Load portfolio ───────────────────────────────────────────
+    # ── Step 1: Load portfolio ───────────────────────────────────────────
     has_portfolio = bool(st.session_state.portfolios)
-    _step_header("2", "Load Portfolio", "Upload a holdings CSV or use the built-in sample data.", done=has_portfolio)
+    _step_header("1", "Load Client Portfolio", "Upload a holdings CSV or use the built-in sample data.", done=has_portfolio)
 
     up_col1, up_col2 = st.columns([3, 2])
     with up_col1:
@@ -800,8 +749,8 @@ with tab_rebalance:
         with st.expander("CSV format"):
             st.code(
                 "account_id,ticker,quantity,price,cash_balance\n"
-                "HIN001,CBA,150.0000,121.5000,5000.0000\n"
-                "HIN001,BHP,200.2500,46.2000,5000.0000",
+                "HIN001,VAS,480.0000,104.0000,5000.0000\n"
+                "HIN001,VGS,265.0000,140.5000,5000.0000",
                 language="text",
             )
 
@@ -815,6 +764,57 @@ with tab_rebalance:
                     f"{len(p.holdings)} holdings  |  "
                     f"Total value: ${p.total_value():,.4f}  |  "
                     f"Cash: ${p.cash_balance:,.4f}"
+                )
+
+    st.divider()
+
+    # ── Step 2: Select model ─────────────────────────────────────────────
+    has_model = bool(st.session_state.model)
+    _step_header("2", "Select Model Portfolio", "Choose the target model to rebalance toward.", done=has_model)
+
+    saved_keys = list(st.session_state.saved_models.keys())
+
+    if not saved_keys:
+        st.warning("No models saved yet. Go to the **Models** tab to create one.")
+    else:
+        current_label = ""
+        if st.session_state.model:
+            current_label = (
+                f"{st.session_state.model.model_id} "
+                f"({st.session_state.model.version})"
+            )
+        default_idx = saved_keys.index(current_label) if current_label in saved_keys else 0
+
+        sel_col1, sel_col2 = st.columns([3, 2])
+        with sel_col1:
+            selected_key = st.selectbox(
+                "Model portfolio",
+                options=saved_keys,
+                index=default_idx,
+                label_visibility="collapsed",
+            )
+        with sel_col2:
+            if st.button("Use this model", type="primary", use_container_width=True):
+                st.session_state.model = st.session_state.saved_models[selected_key]
+                st.session_state.drift_reports = []
+                st.session_state.trade_results = []
+                st.rerun()
+
+        if st.session_state.model:
+            m = st.session_state.model
+            with st.expander(
+                f"Model: {m.model_id} v{m.version}  —  {len(m.holdings)} holdings"
+            ):
+                st.dataframe(
+                    pd.DataFrame([
+                        {
+                            "Ticker": h.ticker,
+                            "Target (%)": f"{h.target_weight*100:.4f}%",
+                        }
+                        for h in m.holdings
+                    ]),
+                    use_container_width=True,
+                    hide_index=True,
                 )
 
     st.divider()
