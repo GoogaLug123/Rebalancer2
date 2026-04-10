@@ -46,165 +46,267 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-/* ── Typography ── */
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
 
+/* ── Global ── */
 html, body, [class*="css"] {
     font-family: 'IBM Plex Sans', sans-serif;
 }
+
+/* ── App background: off-white, not blinding white ── */
+.stApp { background-color: #f5f6f8; }
+section.main > div { background-color: #f5f6f8; }
+
+/* ── Header bar: deep navy strip across top ── */
+.app-header {
+    background: #0f1f3d;
+    color: #f0f4ff;
+    padding: 1rem 1.5rem 0.85rem 1.5rem;
+    margin: -1rem -1rem 1.5rem -1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 3px solid #c9a84c;
+}
+.app-header h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: #f0f4ff;
+    margin: 0;
+}
+.app-header .tagline {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-top: 0.15rem;
+}
+
+/* ── Gold accent divider ── */
+.gold-rule {
+    height: 2px;
+    background: linear-gradient(90deg, #c9a84c 0%, transparent 100%);
+    border: none;
+    margin: 1.25rem 0;
+}
+
+/* ── Status bar: structured progress strip ── */
+.status-bar {
+    background: #0f1f3d;
+    border-radius: 6px;
+    padding: 0.65rem 1.25rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: 0;
+    align-items: center;
+    font-size: 0.78rem;
+}
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0 1.25rem;
+    border-right: 1px solid #1e3a6e;
+    color: #94a3b8;
+}
+.status-item:first-child { padding-left: 0; }
+.status-item:last-child  { border-right: none; }
+.status-label { color: #64748b; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.status-done  { color: #c9a84c; font-weight: 600; }
+.status-pending { color: #4a5568; }
+.status-warn  { color: #f87171; font-weight: 600; }
+
+/* ── Step headers ── */
+.step-header {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    margin: 1.5rem 0 0.6rem 0;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+.step-num {
+    background: #0f1f3d;
+    color: #c9a84c;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    font-family: 'IBM Plex Mono', monospace;
+    border: 1.5px solid #c9a84c;
+}
+.step-num-done {
+    background: #c9a84c;
+    color: #0f1f3d;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    font-family: 'IBM Plex Mono', monospace;
+}
+.step-title    { font-size: 0.95rem; font-weight: 600; color: #0f1f3d; }
+.step-subtitle { font-size: 0.78rem; color: #64748b; margin-top: 0.1rem; }
 
 /* ── Status badges ── */
 .badge {
     display: inline-block;
     padding: 2px 10px;
     border-radius: 2px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
     text-transform: uppercase;
     font-family: 'IBM Plex Mono', monospace;
 }
-.badge-over  { background: #fff3cd; color: #7d5a00; border: 1px solid #ffc107; }
-.badge-under { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
-.badge-divest{ background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
-.badge-ok    { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+.badge-over  { background: #fef3c7; color: #92400e; border-left: 3px solid #d97706; }
+.badge-under { background: #dbeafe; color: #1e3a8a; border-left: 3px solid #2563eb; }
+.badge-divest{ background: #fee2e2; color: #7f1d1d; border-left: 3px solid #dc2626; }
+.badge-ok    { background: #f0fdf4; color: #14532d; border-left: 3px solid #16a34a; }
 
-/* ── Status bar ── */
-.status-bar {
-    background: #f8f9fa;
-    border: 1px solid #e9ecef;
-    border-radius: 6px;
-    padding: 0.6rem 1rem;
-    margin-bottom: 1rem;
-    display: flex;
-    gap: 2rem;
-    align-items: center;
-    font-size: 0.82rem;
-}
-.status-item { display: flex; align-items: center; gap: 0.4rem; }
-.status-done { color: #166534; font-weight: 600; }
-.status-pending { color: #6b7280; }
-.status-warn { color: #92400e; font-weight: 600; }
-
-/* ── Step headers ── */
-.step-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.5rem;
-}
-.step-num {
-    background: #1e293b;
-    color: white;
-    border-radius: 50%;
-    width: 26px;
-    height: 26px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    font-weight: 700;
-    flex-shrink: 0;
-    font-family: 'IBM Plex Mono', monospace;
-}
-.step-num-done {
-    background: #166534;
-    color: white;
-    border-radius: 50%;
-    width: 26px;
-    height: 26px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    font-weight: 700;
-    flex-shrink: 0;
-}
-.step-title { font-size: 1rem; font-weight: 600; color: #1e293b; }
-.step-subtitle { font-size: 0.8rem; color: #6b7280; margin-top: 0; }
+/* ── Drift row highlighting ── */
+.drift-row-over   { border-left: 4px solid #d97706 !important; }
+.drift-row-under  { border-left: 4px solid #2563eb !important; }
+.drift-row-divest { border-left: 4px solid #dc2626 !important; }
 
 /* ── Conflict box ── */
 .conflict-box {
     background: #fffbeb;
     border: 1px solid #f59e0b;
-    border-left: 4px solid #f59e0b;
+    border-left: 4px solid #d97706;
     border-radius: 4px;
-    padding: 0.75rem 1rem;
-    margin: 0.75rem 0;
+    padding: 0.85rem 1.1rem;
+    margin: 0.85rem 0;
     font-size: 0.875rem;
+    color: #451a03;
 }
 
-/* ── Risk scale ── */
-.risk-scale {
-    display: flex;
-    height: 8px;
-    border-radius: 4px;
-    overflow: hidden;
-    margin: 0.5rem 0;
+/* ── Empty state ── */
+.empty-state {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: #94a3b8;
+    border: 1.5px dashed #cbd5e1;
+    border-radius: 8px;
+    margin: 1rem 0;
 }
-.risk-seg-1 { background: #22c55e; flex: 1; }
-.risk-seg-2 { background: #84cc16; flex: 1; }
-.risk-seg-3 { background: #eab308; flex: 1; }
-.risk-seg-4 { background: #f97316; flex: 1; }
-.risk-seg-5 { background: #ef4444; flex: 1; }
-.risk-marker {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.7rem;
-    color: #6b7280;
-    margin-top: 0.2rem;
-}
+.empty-state .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+.empty-state .msg  { font-size: 0.9rem; color: #64748b; }
+.empty-state .hint { font-size: 0.78rem; color: #94a3b8; margin-top: 0.25rem; }
 
-/* ── Metric tweaks ── */
+/* ── Metric cards: larger, more breathing room ── */
 div[data-testid="metric-container"] {
-    background: #f8fafc;
+    background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    padding: 0.75rem 1rem !important;
+    border-top: 3px solid #0f1f3d;
+    border-radius: 4px;
+    padding: 1rem 1.25rem 0.85rem !important;
+    min-height: 80px;
 }
 div[data-testid="metric-container"] label {
-    font-size: 0.75rem !important;
+    font-size: 0.7rem !important;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.07em;
     color: #64748b !important;
     font-family: 'IBM Plex Mono', monospace !important;
 }
-
-/* ── Table tweaks ── */
-thead tr th {
-    background-color: #f1f5f9 !important;
-    font-size: 0.75rem !important;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #475569 !important;
+div[data-testid="metric-container"] [data-testid="stMetricValue"] {
+    font-size: 1.4rem !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    color: #0f1f3d !important;
+    font-weight: 600 !important;
 }
-tbody tr td { font-size: 0.875rem !important; }
 
-/* ── Primary button ── */
+/* ── Table: tighter, financial-grade ── */
+thead tr th {
+    background-color: #0f1f3d !important;
+    color: #94a3b8 !important;
+    font-size: 0.68rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    font-family: 'IBM Plex Mono', monospace !important;
+    border-bottom: 2px solid #c9a84c !important;
+}
+tbody tr td {
+    font-size: 0.84rem !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+}
+tbody tr:hover td { background-color: #f8fafc !important; }
+
+/* ── Buttons ── */
 div[data-testid="stButton"] button[kind="primary"] {
-    background: #1e293b;
+    background: #0f1f3d;
     border: none;
+    border-bottom: 2px solid #c9a84c;
     font-family: 'IBM Plex Sans', sans-serif;
     font-weight: 600;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.03em;
+    border-radius: 3px;
 }
 div[data-testid="stButton"] button[kind="primary"]:hover {
-    background: #334155;
+    background: #1e3a6e;
+    border-bottom-color: #f0c060;
 }
-
-/* ── Download button ── */
 div[data-testid="stDownloadButton"] button {
+    background: #c9a84c;
+    color: #0f1f3d;
+    font-weight: 700;
+    border: none;
+    border-radius: 3px;
     font-family: 'IBM Plex Sans', sans-serif;
-    font-weight: 500;
+}
+div[data-testid="stDownloadButton"] button:hover {
+    background: #b8943e;
+    color: #0f1f3d;
 }
 
-/* ── Sidebar gone ── */
-section[data-testid="stSidebar"] { display: none; }
+/* ── Section card wrapper ── */
+.section-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1rem;
+}
 
 /* ── Tab style ── */
 button[data-baseweb="tab"] {
     font-family: 'IBM Plex Sans', sans-serif !important;
     font-weight: 500 !important;
     font-size: 0.875rem !important;
+    color: #475569 !important;
+}
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: #0f1f3d !important;
+    border-bottom-color: #c9a84c !important;
+}
+
+/* ── Sidebar gone ── */
+section[data-testid="stSidebar"] { display: none; }
+
+/* ── Generous section spacing ── */
+.block-container { padding-top: 0 !important; }
+div[data-testid="stVerticalBlock"] > div { margin-bottom: 0.15rem; }
+hr { border-color: #e2e8f0; margin: 1.5rem 0; }
+
+/* ── Risk scale ── */
+.risk-marker {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: #64748b;
+    margin-top: 0.2rem;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -549,28 +651,28 @@ def _status_bar() -> None:
     drift_reports = st.session_state.drift_reports
     trade_results = st.session_state.trade_results
 
-    m_str = (f'<span class="status-done">✓ {model.model_id} v{model.version}</span>'
-             if model else '<span class="status-pending">No model selected</span>')
-    p_str = (f'<span class="status-done">✓ {len(portfolios)} account(s)</span>'
-             if portfolios else '<span class="status-pending">No portfolio loaded</span>')
+    p_val = (f'<span class="status-done">✓ {len(portfolios)} account(s) loaded</span>'
+             if portfolios else '<span class="status-pending">Not loaded</span>')
+    m_val = (f'<span class="status-done">✓ {model.model_id}</span>'
+             if model else '<span class="status-pending">Not selected</span>')
 
     if drift_reports:
         needs = sum(1 for dr in drift_reports if dr.requires_rebalance)
-        d_str = (f'<span class="status-warn">⚑ {needs} account(s) need rebalancing</span>'
-                 if needs else '<span class="status-done">✓ All accounts in band</span>')
+        d_val = (f'<span class="status-warn">⚑ {needs} need rebalancing</span>'
+                 if needs else '<span class="status-done">✓ All in band</span>')
     else:
-        d_str = '<span class="status-pending">Not run</span>'
+        d_val = '<span class="status-pending">Not run</span>'
 
     all_trades = [t for tr in trade_results for t in tr.trades]
-    t_str = (f'<span class="status-done">✓ {len(all_trades)} trade(s) generated</span>'
-             if all_trades else '<span class="status-pending">No trades generated</span>')
+    t_val = (f'<span class="status-done">✓ {len(all_trades)} trades ready</span>'
+             if all_trades else '<span class="status-pending">Not generated</span>')
 
     st.markdown(
         f'<div class="status-bar">'
-        f'<div class="status-item"><b>Portfolio:</b>&nbsp;{p_str}</div>'
-        f'<div class="status-item"><b>Model:</b>&nbsp;{m_str}</div>'
-        f'<div class="status-item"><b>Drift:</b>&nbsp;{d_str}</div>'
-        f'<div class="status-item"><b>Trades:</b>&nbsp;{t_str}</div>'
+        f'<div class="status-item"><span class="status-label">Portfolio&nbsp;</span>{p_val}</div>'
+        f'<div class="status-item"><span class="status-label">Model&nbsp;</span>{m_val}</div>'
+        f'<div class="status-item"><span class="status-label">Drift&nbsp;</span>{d_val}</div>'
+        f'<div class="status-item"><span class="status-label">Trades&nbsp;</span>{t_val}</div>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -651,32 +753,57 @@ def _risk_scale_html(level: int) -> str:
 
 
 def _colour_drift(val: float) -> str:
+    """Cell colour for drift column."""
     if val > 0:
-        return "background-color: #fffbeb; color: #92400e"
+        return "background-color: #fef9ec; color: #92400e; font-weight: 600"
     if val < 0:
-        return "background-color: #eff6ff; color: #1e40af"
+        return "background-color: #eff6ff; color: #1e3a8a; font-weight: 600"
     return ""
+
+
+def _colour_row(row: "pd.Series") -> list:
+    """Full-row highlight based on status, with left border effect via background."""
+    status = row.get("Status", "")
+    if status == "NOT_IN_MODEL":
+        return ["background-color: #fff1f2; border-left: 4px solid #dc2626"] * len(row)
+    if status == "OVERWEIGHT":
+        return ["background-color: #fffbeb; border-left: 4px solid #d97706"] * len(row)
+    if status == "UNDERWEIGHT":
+        return ["background-color: #eff6ff; border-left: 4px solid #2563eb"] * len(row)
+    return [""] * len(row)
 
 
 def _colour_action(val: str) -> str:
     if val == "BUY":
-        return "color: #166534; font-weight: 600"
+        return "color: #065f46; font-weight: 700; font-family: IBM Plex Mono, monospace"
     if val == "SELL":
-        return "color: #991b1b; font-weight: 600"
+        return "color: #7f1d1d; font-weight: 700; font-family: IBM Plex Mono, monospace"
     return ""
+
+
+def _colour_trade_row(row: "pd.Series") -> list:
+    """Full-row tint for trade table."""
+    action = row.get("Action", "")
+    if action == "BUY":
+        return ["background-color: #f0fdf4; border-left: 4px solid #16a34a"] * len(row)
+    if action == "SELL":
+        return ["background-color: #fff1f2; border-left: 4px solid #dc2626"] * len(row)
+    return [""] * len(row)
 
 
 # ---------------------------------------------------------------------------
 # App header
 # ---------------------------------------------------------------------------
 
-col_logo, col_spacer = st.columns([3, 7])
-with col_logo:
-    st.markdown(
-        '<h2 style="font-family:IBM Plex Mono,monospace;font-weight:600;'
-        'color:#1e293b;margin:0;letter-spacing:-0.02em;">⚖ Rebalancing Engine</h2>',
-        unsafe_allow_html=True,
-    )
+st.markdown(
+    '<div class="app-header">'
+    '<div>'
+    '<h1>⚖ Rebalancing Engine</h1>'
+    '<div class="tagline">Portfolio Drift &amp; Trade Generation</div>'
+    '</div>'
+    '</div>',
+    unsafe_allow_html=True,
+)
 
 _status_bar()
 
@@ -775,7 +902,14 @@ with tab_rebalance:
     saved_keys = list(st.session_state.saved_models.keys())
 
     if not saved_keys:
-        st.warning("No models saved yet. Go to the **Models** tab to create one.")
+        st.markdown(
+            '<div class="empty-state">'
+            '<div class="icon">📁</div>'
+            '<div class="msg">No model portfolios saved</div>'
+            '<div class="hint">Go to the Models tab to create one</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
     else:
         current_label = ""
         if st.session_state.model:
@@ -891,6 +1025,16 @@ with tab_rebalance:
     trade_results = st.session_state.trade_results
     all_trades = [t for tr in trade_results for t in tr.trades]
 
+    if not drift_reports and ready:
+        st.markdown(
+            '<div class="empty-state">'
+            '<div class="icon">📊</div>'
+            '<div class="msg">No results yet</div>'
+            '<div class="hint">Click Run Rebalance above to calculate drift and generate trades</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
     if drift_reports:
         st.divider()
         _step_header("4", "Results", "Review drift and trade instructions for each account.", done=bool(all_trades))
@@ -899,23 +1043,15 @@ with tab_rebalance:
         gross_buy  = sum(t.estimated_value for t in all_trades if t.action == "BUY")
         gross_sell = sum(t.estimated_value for t in all_trades if t.action == "SELL")
 
-        # Summary metrics — two rows
+        # Summary metrics — one clear row of 3
+        st.write("")
         sm1, sm2, sm3 = st.columns(3)
-        sm1.metric("Accounts processed", len(drift_reports))
-        sm2.metric(
-            "Need rebalancing",
-            sum(1 for dr in drift_reports if dr.requires_rebalance),
+        sm1.metric(
+            "Accounts needing rebalance",
+            f"{sum(1 for dr in drift_reports if dr.requires_rebalance)} / {len(drift_reports)}",
         )
-        sm3.metric(
-            "Total flagged holdings",
-            sum(dr.flagged_count for dr in drift_reports),
-        )
-
-        sm4, sm5, sm6 = st.columns(3)
-        sm4.metric("Total trades", len(all_trades))
-        sm5.metric("Gross buy value", f"${gross_buy:,.2f}")
-        sm6.metric("Net cash flow", f"${gross_sell - gross_buy:+,.2f}")
-
+        sm2.metric("Total trades generated", len(all_trades))
+        sm3.metric("Net cash flow", f"${gross_sell - gross_buy:+,.2f}")
         st.write("")
 
         # Per-account tabs
@@ -966,16 +1102,17 @@ with tab_rebalance:
                 st.dataframe(
                     pd.DataFrame(drift_rows)
                     .style
+                    .apply(_colour_row, axis=1)
                     .map(_colour_drift, subset=["Drift (pp)"])
                     .format({
                         "Current (%)":  "{:.4f}%",
                         "Target (%)":   "{:.4f}%",
                         "Drift (pp)":   "{:+.4f}pp",
-                        "Market Value": "${:,.4f}",
+                        "Market Value": "${:,.2f}",
                     })
                     .hide(axis="index"),
                     use_container_width=True,
-                    height=min(60 + len(drift_rows) * 35, 400),
+                    height=min(60 + len(drift_rows) * 38, 420),
                 )
 
                 if dr.requires_rebalance:
@@ -1000,24 +1137,44 @@ with tab_rebalance:
                         f"${tr.closing_cash:,.2f}",
                     )
 
+                    # T+2 settlement (skip weekends)
+                    def _settle_date() -> str:
+                        d = datetime.now(timezone.utc)
+                        added = 0
+                        while added < 2:
+                            d += timedelta(days=1)
+                            if d.weekday() < 5:
+                                added += 1
+                        return d.strftime("%d %b %Y")
+
+                    settle = _settle_date()
                     trows = [{
-                        "Action":     t.action,
-                        "Ticker":     t.ticker,
-                        "Quantity":   round(t.quantity, 4),
-                        "Est. Value": round(t.estimated_value, 4),
+                        "Action":      t.action,
+                        "Ticker":      t.ticker,
+                        "Quantity":    round(t.quantity, 4),
+                        "Est. Value":  round(t.estimated_value, 2),
+                        "Settlement":  settle,
                     } for t in tr.trades]
 
                     st.dataframe(
                         pd.DataFrame(trows)
                         .style
+                        .apply(_colour_trade_row, axis=1)
                         .map(_colour_action, subset=["Action"])
                         .format({
                             "Quantity":   "{:.4f}",
-                            "Est. Value": "${:,.4f}",
+                            "Est. Value": "${:,.2f}",
                         })
                         .hide(axis="index"),
                         use_container_width=True,
-                        height=min(60 + len(trows) * 35, 320),
+                        height=min(60 + len(trows) * 38, 340),
+                        column_config={
+                            "Action":     st.column_config.TextColumn("Action",     width="small"),
+                            "Ticker":     st.column_config.TextColumn("Ticker",     width="small"),
+                            "Quantity":   st.column_config.NumberColumn("Quantity", format="%.4f"),
+                            "Est. Value": st.column_config.NumberColumn("Est. Value ($)", format="$%.2f"),
+                            "Settlement": st.column_config.TextColumn("Settlement (T+2)", width="medium"),
+                        },
                     )
 
                 if tr and tr.suppressed_trades:
