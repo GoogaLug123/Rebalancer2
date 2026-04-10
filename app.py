@@ -123,15 +123,55 @@ section[data-testid="stSidebar"] > div {{ padding: 0 !important; }}
     background: {LIGHT};
 }}
 
-/* ── Sidebar nav buttons (reset) ── */
-section[data-testid="stSidebar"] div[data-testid="stButton"] {{
+/* ── Sidebar nav: radio styled as text links ── */
+section[data-testid="stSidebar"] div[data-testid="stRadio"] {{
     margin: 0 !important;
-    padding: 0 !important;
 }}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] > label {{
+    display: none !important;
+}}
+section[data-testid="stSidebar"] div[role="radiogroup"] {{
+    gap: 0 !important;
+    flex-direction: column !important;
+}}
+section[data-testid="stSidebar"] div[role="radiogroup"] label {{
+    display: flex !important;
+    align-items: center !important;
+    padding: 0.5rem 1.25rem !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    color: {MUTED} !important;
+    cursor: pointer !important;
+    border-left: 2px solid transparent !important;
+    transition: color 0.12s, background 0.12s !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+}}
+section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {{
+    color: {NAVY} !important;
+    background: {OFF_W} !important;
+}}
+section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {{
+    color: {BLUE} !important;
+    border-left-color: {BLUE} !important;
+    font-weight: 600 !important;
+    background: {LIGHT} !important;
+}}
+/* Hide the radio circle completely */
+section[data-testid="stSidebar"] div[role="radiogroup"] div[data-testid="stMarkdownContainer"] {{
+    display: none !important;
+}}
+section[data-testid="stSidebar"] div[role="radiogroup"] input[type="radio"] {{
+    display: none !important;
+}}
+section[data-testid="stSidebar"] div[role="radiogroup"] span[data-baseweb="radio"] {{
+    display: none !important;
+}}
+
+/* ── Sidebar buttons (keep reset for any remaining buttons) ── */
 section[data-testid="stSidebar"] div[data-testid="stButton"] button {{
     background: transparent !important;
     border: none !important;
-    border-left: 2px solid transparent !important;
     color: {MUTED} !important;
     font-size: 0.82rem !important;
     font-weight: 500 !important;
@@ -139,16 +179,7 @@ section[data-testid="stSidebar"] div[data-testid="stButton"] button {{
     padding: 0.5rem 1.25rem !important;
     border-radius: 0 !important;
     width: 100% !important;
-    transition: color 0.12s, background 0.12s, border-color 0.12s !important;
     box-shadow: none !important;
-    height: auto !important;
-    min-height: unset !important;
-    line-height: 1.5 !important;
-}}
-section[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {{
-    color: {NAVY} !important;
-    background: {OFF_W} !important;
-    border-left-color: {BORDER} !important;
 }}
 
 /* ── Sidebar status ── */
@@ -844,30 +875,30 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    pages = [
-        ("rebalance", "Rebalance"),
-        ("models",    "Models"),
-        ("profile",   "Client Profile"),
-        ("settings",  "Settings"),
-    ]
+    # Nav using radio — renders reliably on Streamlit Cloud
+    # CSS strips the radio circle and styles items as plain text links
+    page_labels = ["Rebalance", "Models", "Client Profile", "Settings"]
+    page_ids    = ["rebalance", "models", "profile", "settings"]
 
-    st.write("")
-    for pg_id, label in pages:
-        active_cls = "active" if st.session_state.page == pg_id else ""
-        if st.button(
-            label,
-            key=f"nav_{pg_id}",
-            use_container_width=True,
-            type="secondary",
-        ):
-            st.session_state.page = pg_id
+    current_label = page_labels[page_ids.index(st.session_state.page)]         if st.session_state.page in page_ids else page_labels[0]
+
+    selected = st.radio(
+        "nav",
+        options=page_labels,
+        index=page_labels.index(current_label),
+        label_visibility="collapsed",
+    )
+    if selected:
+        new_page = page_ids[page_labels.index(selected)]
+        if new_page != st.session_state.page:
+            st.session_state.page = new_page
             st.rerun()
 
-    # Status panel
-    model = st.session_state.model
+    # Status panel — live session summary
+    model      = st.session_state.model
     portfolios = st.session_state.portfolios
     drift_reports = st.session_state.drift_reports
-    all_trades_s = [t for tr in st.session_state.trade_results for t in tr.trades]
+    all_trades_s  = [t for tr in st.session_state.trade_results for t in tr.trades]
 
     p_cls = "s-done" if portfolios else "s-idle"
     p_val = f"{len(portfolios)} loaded" if portfolios else "—"
