@@ -123,63 +123,37 @@ section[data-testid="stSidebar"] > div {{ padding: 0 !important; }}
     background: {LIGHT};
 }}
 
-/* ── Sidebar nav: radio styled as text links ── */
-section[data-testid="stSidebar"] div[data-testid="stRadio"] {{
+/* ── Sidebar nav buttons ── */
+section[data-testid="stSidebar"] div[data-testid="stButton"] {{
     margin: 0 !important;
+    padding: 0 !important;
 }}
-section[data-testid="stSidebar"] div[data-testid="stRadio"] > label {{
-    display: none !important;
-}}
-section[data-testid="stSidebar"] div[role="radiogroup"] {{
-    gap: 0 !important;
-    flex-direction: column !important;
-}}
-section[data-testid="stSidebar"] div[role="radiogroup"] label {{
-    display: flex !important;
-    align-items: center !important;
-    padding: 0.5rem 1.25rem !important;
-    font-size: 0.82rem !important;
-    font-weight: 500 !important;
-    color: {MUTED} !important;
-    cursor: pointer !important;
-    border-left: 2px solid transparent !important;
-    transition: color 0.12s, background 0.12s !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
-}}
-section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {{
-    color: {NAVY} !important;
-    background: {OFF_W} !important;
-}}
-section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {{
-    color: {BLUE} !important;
-    border-left-color: {BLUE} !important;
-    font-weight: 600 !important;
-    background: {LIGHT} !important;
-}}
-/* Hide the radio circle completely */
-section[data-testid="stSidebar"] div[role="radiogroup"] div[data-testid="stMarkdownContainer"] {{
-    display: none !important;
-}}
-section[data-testid="stSidebar"] div[role="radiogroup"] input[type="radio"] {{
-    display: none !important;
-}}
-section[data-testid="stSidebar"] div[role="radiogroup"] span[data-baseweb="radio"] {{
-    display: none !important;
-}}
-
-/* ── Sidebar buttons (keep reset for any remaining buttons) ── */
 section[data-testid="stSidebar"] div[data-testid="stButton"] button {{
     background: transparent !important;
     border: none !important;
+    border-left: 2px solid transparent !important;
+    border-radius: 0 !important;
     color: {MUTED} !important;
+    font-family: 'IBM Plex Sans', sans-serif !important;
     font-size: 0.82rem !important;
     font-weight: 500 !important;
     text-align: left !important;
     padding: 0.5rem 1.25rem !important;
-    border-radius: 0 !important;
     width: 100% !important;
     box-shadow: none !important;
+    display: block !important;
+    min-height: 0 !important;
+    height: auto !important;
+    line-height: 1.6 !important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {{
+    background: {OFF_W} !important;
+    color: {NAVY} !important;
+    border-left-color: {BORDER} !important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stButton"] button:focus {{
+    box-shadow: none !important;
+    border-left-color: {BLUE} !important;
 }}
 
 /* ── Sidebar status ── */
@@ -875,24 +849,11 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # Nav using radio — renders reliably on Streamlit Cloud
-    # CSS strips the radio circle and styles items as plain text links
-    page_labels = ["Rebalance", "Models", "Client Profile", "Settings"]
-    page_ids    = ["rebalance", "models", "profile", "settings"]
-
-    current_label = page_labels[page_ids.index(st.session_state.page)]         if st.session_state.page in page_ids else page_labels[0]
-
-    selected = st.radio(
-        "nav",
-        options=page_labels,
-        index=page_labels.index(current_label),
-        label_visibility="collapsed",
-    )
-    if selected:
-        new_page = page_ids[page_labels.index(selected)]
-        if new_page != st.session_state.page:
-            st.session_state.page = new_page
-            st.rerun()
+    # Four nav buttons — one per page
+    if st.button("Rebalance",     key="nav_rebalance", use_container_width=True): st.session_state.page = "rebalance"; st.rerun()
+    if st.button("Models",        key="nav_models",    use_container_width=True): st.session_state.page = "models";    st.rerun()
+    if st.button("Client Profile",key="nav_profile",   use_container_width=True): st.session_state.page = "profile";   st.rerun()
+    if st.button("Settings",      key="nav_settings",  use_container_width=True): st.session_state.page = "settings";  st.rerun()
 
     # Status panel — live session summary
     model      = st.session_state.model
