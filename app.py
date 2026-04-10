@@ -43,13 +43,13 @@ st.set_page_config(
 # ---------------------------------------------------------------------------
 NAVY   = "#0f1f3d"
 BLUE   = "#2754F5"
-BLUE_L = "#dce9ff"
-GOLD   = "#2754F5"   # accent = blue per spec
-OFF_W  = "#f4f6fb"
+BLUE_L = "#e8effe"
+OFF_W  = "#f7f8fc"
 WHITE  = "#ffffff"
-BORDER = "#e2e8f0"
-MUTED  = "#64748b"
-TEXT   = "#1e293b"
+BORDER = "#e4e7ef"
+MUTED  = "#6b7280"
+TEXT   = "#1a2233"
+LIGHT  = "#f0f3ff"
 
 # ---------------------------------------------------------------------------
 # CSS
@@ -57,115 +57,115 @@ TEXT   = "#1e293b"
 
 st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
 
-/* ── Reset & globals ── */
+/* ── Global reset ── */
 html, body, [class*="css"] {{
     font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
     color: {TEXT};
 }}
 .stApp {{ background: {OFF_W}; }}
-.block-container {{ padding: 1.5rem 2rem 4rem 2rem !important; max-width: 1280px; }}
+.block-container {{
+    padding: 2rem 2.5rem 6rem 2.5rem !important;
+    max-width: 1200px;
+}}
 
-/* ── Sidebar nav ── */
+/* ── Sidebar ── */
 section[data-testid="stSidebar"] {{
     background: {NAVY};
-    min-width: 220px !important;
-    max-width: 220px !important;
-    border-right: none;
-    padding-top: 0;
+    min-width: 200px !important;
+    max-width: 200px !important;
 }}
-section[data-testid="stSidebar"] > div {{ padding: 0; }}
+section[data-testid="stSidebar"] > div {{ padding: 0 !important; }}
+
 .sidebar-logo {{
-    padding: 1.5rem 1.25rem 1rem 1.25rem;
-    border-bottom: 1px solid #1e3a6e;
-    margin-bottom: 0.5rem;
+    padding: 1.5rem 1rem 1.25rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    margin-bottom: 0.25rem;
 }}
 .sidebar-logo h2 {{
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 1rem;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.95rem;
     font-weight: 600;
     color: {WHITE};
     margin: 0;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
 }}
 .sidebar-logo p {{
-    font-size: 0.65rem;
-    color: #94a3b8;
+    font-size: 0.68rem;
+    color: rgba(255,255,255,0.35);
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    margin: 0.25rem 0 0 0;
+    margin: 0.2rem 0 0 0;
 }}
-.nav-item {{
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    padding: 0.6rem 1.25rem;
-    cursor: pointer;
-    border-left: 3px solid transparent;
-    font-size: 0.84rem;
-    font-weight: 500;
-    color: #94a3b8;
-    transition: all 0.15s ease;
-    text-decoration: none;
-}}
-.nav-item:hover {{ color: {WHITE}; background: rgba(255,255,255,0.05); }}
-.nav-item.active {{
-    color: {WHITE};
-    border-left-color: {BLUE};
-    background: rgba(39,84,245,0.12);
-}}
-.nav-item .nav-icon {{ font-size: 1rem; width: 20px; text-align: center; }}
 .nav-section-label {{
     font-size: 0.6rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: #334155;
-    padding: 1rem 1.25rem 0.3rem 1.25rem;
+    color: rgba(255,255,255,0.25);
+    padding: 1rem 1rem 0.25rem 1rem;
     font-family: 'IBM Plex Mono', monospace;
 }}
-/* ── Status panel in sidebar ── */
+
+/* ── Sidebar nav buttons ── */
+section[data-testid="stSidebar"] div[data-testid="stButton"] button {{
+    background: transparent !important;
+    border: none !important;
+    color: rgba(255,255,255,0.55) !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    text-align: left !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 0 !important;
+    width: 100% !important;
+    transition: color 0.15s, background 0.15s !important;
+    box-shadow: none !important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {{
+    color: {WHITE} !important;
+    background: rgba(255,255,255,0.06) !important;
+}}
+
+/* ── Sidebar status ── */
 .sidebar-status {{
     position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: #0a1628;
-    padding: 0.85rem 1.25rem;
-    border-top: 1px solid #1e3a6e;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.2);
+    padding: 0.85rem 1rem;
+    border-top: 1px solid rgba(255,255,255,0.07);
 }}
 .sidebar-status-row {{
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.4rem;
-    font-size: 0.72rem;
+    margin-bottom: 0.35rem;
+    font-size: 0.7rem;
+    font-family: 'IBM Plex Mono', monospace;
 }}
-.sidebar-status-label {{ color: #475569; text-transform: uppercase; letter-spacing: 0.06em; font-family: 'IBM Plex Mono', monospace; }}
-.s-done  {{ color: {BLUE}; font-weight: 600; }}
-.s-warn  {{ color: #f87171; font-weight: 600; }}
-.s-idle  {{ color: #334155; }}
+.sidebar-status-row:last-child {{ margin-bottom: 0; }}
+.sidebar-status-label {{ color: rgba(255,255,255,0.28); text-transform: uppercase; letter-spacing: 0.06em; }}
+.s-done   {{ color: {BLUE}; font-weight: 600; }}
+.s-warn   {{ color: #f87171; font-weight: 600; }}
+.s-idle   {{ color: rgba(255,255,255,0.22); }}
 
-/* ── Page header ── */
-.page-header {{
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    margin-bottom: 1.5rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 2px solid {BLUE};
+/* ── Page heading ── */
+.page-heading {{
+    margin-bottom: 2rem;
 }}
-.page-header h1 {{
+.page-heading h1 {{
     font-family: 'IBM Plex Sans', sans-serif;
-    font-size: 1.4rem;
+    font-size: 2rem;
     font-weight: 600;
     color: {NAVY};
-    margin: 0;
+    margin: 0 0 0.25rem 0;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
 }}
-.page-header .sub {{
-    font-size: 0.8rem;
+.page-heading .sub {{
+    font-size: 0.82rem;
     color: {MUTED};
-    margin-top: 0.2rem;
+    margin: 0;
 }}
 
 /* ── Cards ── */
@@ -173,287 +173,300 @@ section[data-testid="stSidebar"] > div {{ padding: 0; }}
     background: {WHITE};
     border: 1px solid {BORDER};
     border-radius: 8px;
-    padding: 1.25rem 1.5rem;
+    padding: 1.5rem;
     margin-bottom: 1.25rem;
-    box-shadow: 0 1px 3px rgba(15,31,61,0.06);
-    animation: fadeIn 0.3s ease;
+    animation: fadeUp 0.2s ease;
 }}
 .card-header {{
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    margin-bottom: 1rem;
-    padding-bottom: 0.75rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.85rem;
     border-bottom: 1px solid {BORDER};
 }}
 .card-step {{
-    background: {NAVY};
-    color: {BLUE};
-    border: 1.5px solid {BLUE};
+    width: 24px; height: 24px;
     border-radius: 50%;
-    width: 26px; height: 26px;
+    border: 1.5px solid {BLUE};
+    color: {BLUE};
+    background: {WHITE};
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 700;
     flex-shrink: 0;
     font-family: 'IBM Plex Mono', monospace;
 }}
 .card-step-done {{
+    width: 24px; height: 24px;
+    border-radius: 50%;
     background: {BLUE};
     color: {WHITE};
-    border-radius: 50%;
-    width: 26px; height: 26px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 700;
     flex-shrink: 0;
 }}
-.card-title {{ font-size: 0.95rem; font-weight: 600; color: {NAVY}; }}
+.card-title   {{ font-size: 0.9rem; font-weight: 600; color: {NAVY}; }}
 .card-subtitle {{ font-size: 0.75rem; color: {MUTED}; margin-top: 0.1rem; }}
 
 /* ── Metric cards ── */
 div[data-testid="metric-container"] {{
     background: {WHITE};
     border: 1px solid {BORDER};
-    border-top: 3px solid {BLUE};
     border-radius: 6px;
-    padding: 1rem 1.25rem 0.85rem !important;
-    min-height: 82px;
-    box-shadow: 0 1px 2px rgba(15,31,61,0.04);
+    padding: 1rem 1.25rem !important;
 }}
 div[data-testid="metric-container"] label {{
     font-size: 0.68rem !important;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.07em;
     color: {MUTED} !important;
     font-family: 'IBM Plex Mono', monospace !important;
     font-weight: 500 !important;
 }}
 div[data-testid="metric-container"] [data-testid="stMetricValue"] {{
-    font-size: 1.5rem !important;
+    font-size: 1.35rem !important;
     font-family: 'IBM Plex Mono', monospace !important;
     color: {NAVY} !important;
     font-weight: 600 !important;
 }}
 
-/* ── Status pills (drift table) ── */
+/* ── Status pills ── */
 .pill {{
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    padding: 2px 9px;
+    padding: 1px 8px;
     border-radius: 20px;
-    font-size: 0.68rem;
+    font-size: 0.67rem;
     font-weight: 700;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     font-family: 'IBM Plex Mono', monospace;
     white-space: nowrap;
 }}
-.pill-over  {{ background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }}
-.pill-under {{ background: #dbeafe; color: #1e3a8a; border: 1px solid #93c5fd; }}
-.pill-divest{{ background: #fee2e2; color: #7f1d1d; border: 1px solid #fca5a5; }}
-.pill-ok    {{ background: #f0fdf4; color: #14532d; border: 1px solid #86efac; }}
+.pill-over   {{ background: #fef3c7; color: #92400e; }}
+.pill-under  {{ background: {BLUE_L}; color: {BLUE}; }}
+.pill-divest {{ background: #fee2e2; color: #991b1b; }}
+.pill-ok     {{ background: #f0fdf4; color: #166534; }}
 
 /* ── Tables ── */
 thead tr th {{
-    background: {NAVY} !important;
-    color: #94a3b8 !important;
+    background: {LIGHT} !important;
+    color: {NAVY} !important;
     font-size: 0.67rem !important;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.07em;
     font-family: 'IBM Plex Mono', monospace !important;
-    border-bottom: 2px solid {BLUE} !important;
-    padding: 0.6rem 0.75rem !important;
+    border-bottom: 1px solid {BORDER} !important;
+    padding: 0.55rem 0.75rem !important;
+    font-weight: 600 !important;
 }}
 tbody tr td {{
-    font-size: 0.83rem !important;
+    font-size: 0.82rem !important;
     font-family: 'IBM Plex Mono', monospace !important;
-    border-bottom: 1px solid #f1f5f9 !important;
-    padding: 0.55rem 0.75rem !important;
+    border-bottom: 1px solid #f5f6fa !important;
+    padding: 0.5rem 0.75rem !important;
+    color: {TEXT} !important;
 }}
-tbody tr:hover td {{ background: #f8fafc !important; }}
+tbody tr:hover td {{ background: #fafbff !important; }}
+
+/* ── Buttons — general reset ── */
+div[data-testid="stButton"] button {{
+    font-family: 'IBM Plex Sans', sans-serif !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    border-radius: 5px !important;
+    transition: all 0.15s ease !important;
+    box-shadow: none !important;
+}}
+div[data-testid="stButton"] button[kind="primary"] {{
+    background: {NAVY} !important;
+    color: {WHITE} !important;
+    border: none !important;
+    font-weight: 600 !important;
+    padding: 0.45rem 1.1rem !important;
+}}
+div[data-testid="stButton"] button[kind="primary"]:hover {{
+    background: #1a3260 !important;
+}}
+div[data-testid="stButton"] button[kind="primary"]:disabled {{
+    background: #c8cdd8 !important;
+    color: {WHITE} !important;
+    cursor: not-allowed !important;
+}}
+div[data-testid="stButton"] button[kind="secondary"] {{
+    background: {WHITE} !important;
+    color: {TEXT} !important;
+    border: 1px solid {BORDER} !important;
+    padding: 0.45rem 1.1rem !important;
+}}
+div[data-testid="stButton"] button[kind="secondary"]:hover {{
+    border-color: {BLUE} !important;
+    color: {BLUE} !important;
+}}
 
 /* ── Run button ── */
-.run-btn-wrap > div > button {{
+.run-btn-wrap div[data-testid="stButton"] button {{
     width: 100% !important;
-    height: 52px !important;
-    font-size: 1rem !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.04em !important;
+    height: 46px !important;
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
     background: {BLUE} !important;
     border: none !important;
-    border-radius: 6px !important;
-    color: white !important;
-    transition: background 0.2s ease, transform 0.1s ease !important;
+    letter-spacing: 0.02em !important;
 }}
-.run-btn-wrap > div > button:hover {{
-    background: #1a40d9 !important;
-    transform: translateY(-1px);
+.run-btn-wrap div[data-testid="stButton"] button:hover {{
+    background: #1f44d6 !important;
 }}
-.run-btn-wrap > div > button:disabled {{
-    background: #94a3b8 !important;
-    transform: none;
-    cursor: not-allowed !important;
+.run-btn-wrap div[data-testid="stButton"] button:disabled {{
+    background: #c8cdd8 !important;
+}}
+
+/* ── Download button ── */
+div[data-testid="stDownloadButton"] button {{
+    background: {WHITE} !important;
+    color: {BLUE} !important;
+    border: 1.5px solid {BLUE} !important;
+    font-family: 'IBM Plex Sans', sans-serif !important;
+    font-size: 0.82rem !important;
+    font-weight: 600 !important;
+    border-radius: 5px !important;
+    padding: 0.45rem 1.1rem !important;
+}}
+div[data-testid="stDownloadButton"] button:hover {{
+    background: {BLUE_L} !important;
 }}
 
 /* ── Sticky download bar ── */
 .sticky-download {{
     position: fixed;
-    bottom: 0;
-    left: 220px;
-    right: 0;
-    background: {NAVY};
-    border-top: 2px solid {BLUE};
-    padding: 0.75rem 2rem;
+    bottom: 0; left: 200px; right: 0;
+    background: {WHITE};
+    border-top: 1px solid {BORDER};
+    padding: 0.75rem 2.5rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
     z-index: 999;
-    box-shadow: 0 -4px 20px rgba(15,31,61,0.2);
-    animation: slideUp 0.3s ease;
+    animation: slideUp 0.25s ease;
 }}
-.sticky-download .dl-summary {{
-    color: #94a3b8;
+.dl-summary {{
     font-size: 0.78rem;
     font-family: 'IBM Plex Mono', monospace;
+    color: {MUTED};
 }}
-.sticky-download .dl-summary strong {{ color: {WHITE}; }}
+.dl-summary strong {{ color: {NAVY}; }}
 
-/* ── Download button ── */
-div[data-testid="stDownloadButton"] button {{
-    background: {BLUE} !important;
-    color: {WHITE} !important;
-    font-weight: 700 !important;
-    border: none !important;
-    border-radius: 4px !important;
-    font-family: 'IBM Plex Sans', sans-serif !important;
-    padding: 0.5rem 1.25rem !important;
-    transition: background 0.2s ease !important;
-}}
-div[data-testid="stDownloadButton"] button:hover {{
-    background: #1a40d9 !important;
-}}
-
-/* ── Primary buttons ── */
-div[data-testid="stButton"] button[kind="primary"] {{
-    background: {NAVY};
-    border: none;
-    border-bottom: 2px solid {BLUE};
-    font-family: 'IBM Plex Sans', sans-serif;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    border-radius: 4px;
-    transition: background 0.15s ease;
-}}
-div[data-testid="stButton"] button[kind="primary"]:hover {{
-    background: #1e3a6e;
-}}
-
-/* ── Account accordion ── */
-.account-card {{
-    background: {WHITE};
-    border: 1px solid {BORDER};
-    border-radius: 8px;
-    margin-bottom: 0.75rem;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(15,31,61,0.05);
-    animation: fadeIn 0.25s ease;
-}}
-.account-header {{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.85rem 1.25rem;
-    background: {WHITE};
-    cursor: pointer;
-    border-bottom: 1px solid transparent;
-}}
-.account-header:hover {{ background: #f8fafc; }}
-.account-header.flagged {{ border-left: 4px solid {BLUE}; }}
-.account-header.ok      {{ border-left: 4px solid #16a34a; }}
-.account-hin  {{ font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: {NAVY}; font-size: 0.9rem; }}
-.account-meta {{ font-size: 0.75rem; color: {MUTED}; margin-top: 0.15rem; }}
-.account-pills {{ display: flex; gap: 0.5rem; align-items: center; }}
-.account-body {{ padding: 1.25rem 1.5rem; border-top: 1px solid {BORDER}; }}
-
-/* ── Model description tooltip ── */
+/* ── Model description ── */
 .model-desc {{
-    background: #f8fafc;
+    background: {LIGHT};
     border: 1px solid {BORDER};
-    border-left: 3px solid {BLUE};
+    border-left: 2px solid {BLUE};
     border-radius: 4px;
-    padding: 0.6rem 0.85rem;
+    padding: 0.55rem 0.85rem;
     font-size: 0.78rem;
     color: {MUTED};
     margin-top: 0.5rem;
-    animation: fadeIn 0.2s ease;
+    animation: fadeUp 0.15s ease;
 }}
-.model-desc strong {{ color: {NAVY}; }}
+.model-desc strong {{ color: {TEXT}; font-weight: 600; }}
 
 /* ── Empty states ── */
 .empty-state {{
     text-align: center;
-    padding: 2.5rem 1rem;
-    color: {MUTED};
-    border: 1.5px dashed #cbd5e1;
+    padding: 2rem 1rem;
+    border: 1.5px dashed {BORDER};
     border-radius: 8px;
-    margin: 0.5rem 0;
     background: {WHITE};
+    margin: 0.5rem 0;
 }}
-.empty-state .icon {{ font-size: 2rem; margin-bottom: 0.5rem; }}
-.empty-state .msg  {{ font-size: 0.9rem; color: {TEXT}; font-weight: 500; }}
-.empty-state .hint {{ font-size: 0.78rem; color: {MUTED}; margin-top: 0.3rem; }}
+.empty-state .icon {{ font-size: 1.75rem; margin-bottom: 0.4rem; }}
+.empty-state .msg  {{ font-size: 0.88rem; color: {TEXT}; font-weight: 500; }}
+.empty-state .hint {{ font-size: 0.75rem; color: {MUTED}; margin-top: 0.2rem; }}
 
 /* ── Conflict box ── */
 .conflict-box {{
     background: #fffbeb;
     border: 1px solid #f59e0b;
-    border-left: 4px solid #d97706;
+    border-left: 3px solid #d97706;
     border-radius: 4px;
-    padding: 0.85rem 1rem;
+    padding: 0.75rem 1rem;
     margin: 0.75rem 0;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: #451a03;
 }}
 
-/* ── Tabs (inner account tabs removed, using expanders instead) ── */
+/* ── Risk bar ── */
+.risk-marker {{
+    font-size: 0.7rem;
+    color: {MUTED};
+    font-family: 'IBM Plex Mono', monospace;
+    margin-top: 0.2rem;
+}}
+
+/* ── Tabs ── */
 button[data-baseweb="tab"] {{
     font-family: 'IBM Plex Sans', sans-serif !important;
+    font-size: 0.82rem !important;
     font-weight: 500 !important;
-    font-size: 0.875rem !important;
+    color: {MUTED} !important;
+    padding: 0.5rem 0.85rem !important;
 }}
 button[data-baseweb="tab"][aria-selected="true"] {{
     color: {NAVY} !important;
     border-bottom-color: {BLUE} !important;
+    font-weight: 600 !important;
+}}
+
+/* ── Inputs ── */
+div[data-testid="stTextInput"] input,
+div[data-testid="stNumberInput"] input {{
+    font-family: 'IBM Plex Sans', sans-serif !important;
+    font-size: 0.82rem !important;
+    border-radius: 5px !important;
+    border-color: {BORDER} !important;
+}}
+div[data-testid="stSelectbox"] div[data-baseweb="select"] {{
+    font-size: 0.82rem !important;
+    border-radius: 5px !important;
+}}
+
+/* ── Captions ── */
+div[data-testid="stCaptionContainer"] {{
+    font-size: 0.75rem !important;
+    color: {MUTED} !important;
+}}
+
+/* ── Dividers ── */
+hr {{ border-color: {BORDER} !important; margin: 1.25rem 0 !important; }}
+
+/* ── Expanders ── */
+details summary {{
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    color: {TEXT} !important;
+}}
+
+/* ── Accessibility ── */
+button:focus-visible {{
+    outline: 2px solid {BLUE} !important;
+    outline-offset: 2px !important;
 }}
 
 /* ── Animations ── */
-@keyframes fadeIn {{
-    from {{ opacity: 0; transform: translateY(6px); }}
+@keyframes fadeUp {{
+    from {{ opacity: 0; transform: translateY(4px); }}
     to   {{ opacity: 1; transform: translateY(0); }}
 }}
 @keyframes slideUp {{
     from {{ transform: translateY(100%); }}
     to   {{ transform: translateY(0); }}
 }}
-@keyframes countUp {{
-    from {{ opacity: 0; }}
-    to   {{ opacity: 1; }}
-}}
-
-/* ── Accessibility: focus rings ── */
-button:focus-visible {{
-    outline: 3px solid {BLUE} !important;
-    outline-offset: 2px !important;
-}}
-
-/* ── Spacing ── */
-hr {{ border-color: {BORDER}; margin: 1.25rem 0; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -801,37 +814,22 @@ def _score_to_model(score: float, answers: dict) -> str:
 with st.sidebar:
     st.markdown(
         '<div class="sidebar-logo">'
-        '<h2>⚖ Rebalancing Engine</h2>'
-        '<p>Portfolio Drift &amp; Trade Generation</p>'
+        '<h2>Rebalancing Engine</h2>'
+        '<p>Portfolio &amp; Trade Management</p>'
         '</div>',
         unsafe_allow_html=True,
     )
 
     pages = [
-        ("rebalance", "📊", "Rebalance"),
-        ("models",    "📁", "Models"),
-        ("profile",   "📋", "Client Profile"),
-        ("settings",  "⚙",  "Settings"),
+        ("rebalance", "Rebalance"),
+        ("models",    "Models"),
+        ("profile",   "Client Profile"),
+        ("settings",  "Settings"),
     ]
 
-    st.markdown('<div class="nav-section-label">Main</div>', unsafe_allow_html=True)
-    for pg_id, icon, label in pages[:2]:
-        active_cls = "active" if st.session_state.page == pg_id else ""
-        if st.button(
-            f"{icon}  {label}",
-            key=f"nav_{pg_id}",
-            use_container_width=True,
-        ):
-            st.session_state.page = pg_id
-            st.rerun()
-
-    st.markdown('<div class="nav-section-label">Optional</div>', unsafe_allow_html=True)
-    for pg_id, icon, label in pages[2:]:
-        if st.button(
-            f"{icon}  {label}",
-            key=f"nav_{pg_id}",
-            use_container_width=True,
-        ):
+    st.write("")
+    for pg_id, label in pages:
+        if st.button(label, key=f"nav_{pg_id}", use_container_width=True):
             st.session_state.page = pg_id
             st.rerun()
 
@@ -875,7 +873,7 @@ page = st.session_state.page
 if page == "rebalance":
 
     st.markdown(
-        '<div class="page-header">'
+        '<div class="page-heading">'
         '<div><h1>Rebalance</h1>'
         '<div class="sub">Load a portfolio, select a model, generate trades</div></div>'
         '</div>',
@@ -1272,7 +1270,7 @@ if page == "rebalance":
 elif page == "models":
 
     st.markdown(
-        '<div class="page-header">'
+        '<div class="page-heading">'
         '<div><h1>Model Portfolios</h1>'
         '<div class="sub">Create and manage target model portfolios</div></div>'
         '</div>',
@@ -1405,7 +1403,7 @@ elif page == "models":
 elif page == "profile":
 
     st.markdown(
-        '<div class="page-header">'
+        '<div class="page-heading">'
         '<div><h1>Client Profile</h1>'
         '<div class="sub">Optional — risk questionnaire to determine suitable model portfolio</div></div>'
         '</div>',
@@ -1590,7 +1588,7 @@ elif page == "profile":
 elif page == "settings":
 
     st.markdown(
-        '<div class="page-header">'
+        '<div class="page-heading">'
         '<div><h1>Settings</h1>'
         '<div class="sub">Questionnaire weighting and principal controls</div></div>'
         '</div>',
