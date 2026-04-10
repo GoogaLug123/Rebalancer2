@@ -73,81 +73,105 @@ html, body, [class*="css"] {{
 
 /* ── Sidebar ── */
 section[data-testid="stSidebar"] {{
-    background: {NAVY};
+    background: {WHITE};
+    border-right: 1px solid {BORDER};
     min-width: 200px !important;
     max-width: 200px !important;
 }}
 section[data-testid="stSidebar"] > div {{ padding: 0 !important; }}
 
 .sidebar-logo {{
-    padding: 1.5rem 1rem 1.25rem 1rem;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    margin-bottom: 0.25rem;
+    padding: 1.75rem 1.25rem 1.25rem 1.25rem;
+    border-bottom: 1px solid {BORDER};
+    margin-bottom: 0.5rem;
 }}
 .sidebar-logo h2 {{
     font-family: 'IBM Plex Sans', sans-serif;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 600;
-    color: {WHITE};
+    color: {NAVY};
     margin: 0;
     letter-spacing: 0.01em;
 }}
 .sidebar-logo p {{
-    font-size: 0.68rem;
-    color: rgba(255,255,255,0.35);
+    font-size: 0.67rem;
+    color: {MUTED};
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.07em;
     margin: 0.2rem 0 0 0;
 }}
-.nav-section-label {{
-    font-size: 0.6rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: rgba(255,255,255,0.25);
-    padding: 1rem 1rem 0.25rem 1rem;
-    font-family: 'IBM Plex Mono', monospace;
+
+/* ── Sidebar nav links ── */
+.nav-link {{
+    display: block;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: {MUTED};
+    text-decoration: none;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: color 0.12s, border-color 0.12s;
+    line-height: 1.5;
+    margin: 0.1rem 0;
+}}
+.nav-link:hover {{ color: {NAVY}; }}
+.nav-link.active {{
+    color: {BLUE};
+    border-left-color: {BLUE};
+    font-weight: 600;
+    background: {LIGHT};
 }}
 
-/* ── Sidebar nav buttons ── */
+/* ── Sidebar nav buttons (reset) ── */
+section[data-testid="stSidebar"] div[data-testid="stButton"] {{
+    margin: 0 !important;
+    padding: 0 !important;
+}}
 section[data-testid="stSidebar"] div[data-testid="stButton"] button {{
     background: transparent !important;
     border: none !important;
-    color: rgba(255,255,255,0.55) !important;
+    border-left: 2px solid transparent !important;
+    color: {MUTED} !important;
     font-size: 0.82rem !important;
     font-weight: 500 !important;
     text-align: left !important;
-    padding: 0.5rem 1rem !important;
+    padding: 0.5rem 1.25rem !important;
     border-radius: 0 !important;
     width: 100% !important;
-    transition: color 0.15s, background 0.15s !important;
+    transition: color 0.12s, background 0.12s, border-color 0.12s !important;
     box-shadow: none !important;
+    height: auto !important;
+    min-height: unset !important;
+    line-height: 1.5 !important;
 }}
 section[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {{
-    color: {WHITE} !important;
-    background: rgba(255,255,255,0.06) !important;
+    color: {NAVY} !important;
+    background: {OFF_W} !important;
+    border-left-color: {BORDER} !important;
 }}
 
 /* ── Sidebar status ── */
 .sidebar-status {{
     position: absolute;
     bottom: 0; left: 0; right: 0;
-    background: rgba(0,0,0,0.2);
-    padding: 0.85rem 1rem;
-    border-top: 1px solid rgba(255,255,255,0.07);
+    background: {WHITE};
+    padding: 0.85rem 1.25rem;
+    border-top: 1px solid {BORDER};
 }}
 .sidebar-status-row {{
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.35rem;
-    font-size: 0.7rem;
+    margin-bottom: 0.3rem;
+    font-size: 0.68rem;
     font-family: 'IBM Plex Mono', monospace;
 }}
 .sidebar-status-row:last-child {{ margin-bottom: 0; }}
-.sidebar-status-label {{ color: rgba(255,255,255,0.28); text-transform: uppercase; letter-spacing: 0.06em; }}
+.sidebar-status-label {{ color: {MUTED}; text-transform: uppercase; letter-spacing: 0.06em; }}
 .s-done   {{ color: {BLUE}; font-weight: 600; }}
-.s-warn   {{ color: #f87171; font-weight: 600; }}
-.s-idle   {{ color: rgba(255,255,255,0.22); }}
+.s-warn   {{ color: #dc2626; font-weight: 600; }}
+.s-idle   {{ color: #c8cdd8; }}
 
 /* ── Page heading ── */
 .page-heading {{
@@ -829,7 +853,13 @@ with st.sidebar:
 
     st.write("")
     for pg_id, label in pages:
-        if st.button(label, key=f"nav_{pg_id}", use_container_width=True):
+        active_cls = "active" if st.session_state.page == pg_id else ""
+        if st.button(
+            label,
+            key=f"nav_{pg_id}",
+            use_container_width=True,
+            type="secondary",
+        ):
             st.session_state.page = pg_id
             st.rerun()
 
