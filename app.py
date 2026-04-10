@@ -71,8 +71,11 @@ html, body, [class*="css"] {{
     max-width: 1200px;
 }}
 
-/* ── Hide sidebar entirely ── */
+/* ── Hide sidebar and toggle entirely ── */
 section[data-testid="stSidebar"] {{ display: none !important; }}
+button[data-testid="baseButton-headerNoPadding"] {{ display: none !important; }}
+div[data-testid="collapsedControl"] {{ display: none !important; }}
+.st-emotion-cache-1egp75y {{ display: none !important; }}
 
 /* ── Tab styling ── */
 button[data-baseweb="tab"] {{
