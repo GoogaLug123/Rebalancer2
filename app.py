@@ -845,6 +845,11 @@ def _score_to_model(score: float, answers: dict) -> str:
 # Sidebar navigation
 # ---------------------------------------------------------------------------
 
+# Handle query param navigation
+qp = st.query_params.get("page", None)
+if qp and qp != st.session_state.page:
+    st.session_state.page = qp
+
 with st.sidebar:
     st.markdown(
         '<div class="sidebar-logo">'
@@ -854,11 +859,23 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # Four nav buttons — one per page
-    if st.button("Rebalance",     key="nav_rebalance", use_container_width=True): st.session_state.page = "rebalance"; st.rerun()
-    if st.button("Models",        key="nav_models",    use_container_width=True): st.session_state.page = "models";    st.rerun()
-    if st.button("Client Profile",key="nav_profile",   use_container_width=True): st.session_state.page = "profile";   st.rerun()
-    if st.button("Settings",      key="nav_settings",  use_container_width=True): st.session_state.page = "settings";  st.rerun()
+    pg = st.session_state.page
+    def _nav(pid, label):
+        cls = "nav-active" if pg == pid else "nav-inactive"
+        return (
+            f'<a class="nav-link {cls}" ' 
+            f'href="?page={pid}" target="_self">{label}</a>'
+        )
+
+    st.markdown(
+        '<div class="nav-block">' +
+        _nav("rebalance", "Rebalance") +
+        _nav("models",    "Models") +
+        _nav("profile",   "Client Profile") +
+        _nav("settings",  "Settings") +
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
     # Status panel — live session summary
     model      = st.session_state.model
