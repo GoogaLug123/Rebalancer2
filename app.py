@@ -371,6 +371,111 @@ SAMPLE_MODEL_WEIGHTS = [
 ]
 
 # ---------------------------------------------------------------------------
+# Predefined model portfolios
+# All weights sum to 100%. ETF-based where appropriate for wrap platform use.
+# ---------------------------------------------------------------------------
+
+PREDEFINED_MODELS: list = [
+    {
+        "model_id": "CONSERVATIVE",
+        "version":  "2024-Q2",
+        "holdings": [
+            ("AGG",  40.0),
+            ("VAF",  20.0),
+            ("VAS",  20.0),
+            ("VGS",  10.0),
+            ("VHY",  10.0),
+        ],
+    },
+    {
+        "model_id": "MODERATE",
+        "version":  "2024-Q2",
+        "holdings": [
+            ("VAS",  25.0),
+            ("VGS",  25.0),
+            ("VAF",  25.0),
+            ("AGG",  15.0),
+            ("VHY",  10.0),
+        ],
+    },
+    {
+        "model_id": "GROWTH",
+        "version":  "2024-Q2",
+        "holdings": [
+            ("VAS",  30.0),
+            ("VGS",  25.0),
+            ("VGE",  15.0),
+            ("VAF",  20.0),
+            ("VHY",  10.0),
+        ],
+    },
+    {
+        "model_id": "HIGH_GROWTH",
+        "version":  "2024-Q2",
+        "holdings": [
+            ("VAS",  30.0),
+            ("VGS",  30.0),
+            ("VGE",  15.0),
+            ("NDQ",  15.0),
+            ("VHY",  10.0),
+        ],
+    },
+    {
+        "model_id": "AGGRESSIVE",
+        "version":  "2024-Q2",
+        "holdings": [
+            ("VAS",  30.0),
+            ("VGS",  30.0),
+            ("NDQ",  20.0),
+            ("VGE",  20.0),
+        ],
+    },
+    {
+        "model_id": "INCOME",
+        "version":  "2024-Q2",
+        "holdings": [
+            ("VHY",  30.0),
+            ("VAF",  25.0),
+            ("AFI",  15.0),
+            ("ARG",  15.0),
+            ("VAP",  15.0),
+        ],
+    },
+    {
+        "model_id": "ESG",
+        "version":  "2024-Q2",
+        "holdings": [
+            ("ETHI", 35.0),
+            ("FAIR", 30.0),
+            ("VESG", 20.0),
+            ("VBND", 15.0),
+        ],
+    },
+    {
+        "model_id": "AUSTRALIAN_EQ",
+        "version":  "2024-Q2",
+        "holdings": [
+            ("CBA",  25.0),
+            ("BHP",  20.0),
+            ("CSL",  15.0),
+            ("WES",  15.0),
+            ("ANZ",  12.0),
+            ("MQG",   8.0),
+            ("FMG",   5.0),
+        ],
+    },
+    {
+        "model_id": "INDEX_PASSIVE",
+        "version":  "2024-Q2",
+        "holdings": [
+            ("VAS",  40.0),
+            ("VGS",  40.0),
+            ("VAF",  20.0),
+        ],
+    },
+]
+
+# ---------------------------------------------------------------------------
 # Session state
 # ---------------------------------------------------------------------------
 
@@ -396,14 +501,25 @@ def _init_state() -> None:
 _init_state()
 
 if not st.session_state.saved_models:
-    try:
-        _h = [ModelHolding(ticker=t, target_weight=w / 100.0)
-              for t, w in SAMPLE_MODEL_WEIGHTS]
-        _m = ModelPortfolio(model_id="GROWTH_70", version="2024-Q2", holdings=_h)
-        st.session_state.saved_models["GROWTH_70 (2024-Q2)"] = _m
-        st.session_state.model = _m
-    except Exception:
-        pass
+    for _pm in PREDEFINED_MODELS:
+        try:
+            _h = [ModelHolding(ticker=t, target_weight=w / 100.0)
+                  for t, w in _pm["holdings"]]
+            _m = ModelPortfolio(
+                model_id=_pm["model_id"],
+                version=_pm["version"],
+                holdings=_h,
+            )
+            _label = f"{_pm['model_id']} ({_pm['version']})"
+            st.session_state.saved_models[_label] = _m
+        except Exception:
+            pass
+    # Set GROWTH as the default active model
+    _default_key = "GROWTH (2024-Q2)"
+    if _default_key in st.session_state.saved_models:
+        st.session_state.model = st.session_state.saved_models[_default_key]
+    elif st.session_state.saved_models:
+        st.session_state.model = list(st.session_state.saved_models.values())[0]
 
 # ---------------------------------------------------------------------------
 # Helpers
